@@ -42,7 +42,8 @@ Five themes use 179,938 bytes
 of packed flash masks with no SVG parser, runtime resize, animation or extra
 framebuffer. Library text uses three small one-bit bitmap font sizes in flash,
 registered only for the Library visit. It does not activate a scalable font
-workspace. Exact finished counts read cached statistics once per book per
+workspace. C3 devices alias their existing bitmap fonts to stay within the app
+partition. Exact finished counts read cached statistics once per book per
 Library visit, then reuse two completion bits per indexed book. Refresh and
 book actions invalidate that cache. At the 32,767-book index limit, status and
 page arrays need at most about 28 KiB in addition to collection references;
