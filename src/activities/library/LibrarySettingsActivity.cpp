@@ -2,6 +2,7 @@
 
 #include <I18n.h>
 
+#include "LibraryShelfLayout.h"
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
 #include "components/UiAppHelpers.h"
@@ -10,7 +11,17 @@ namespace fui = freeink::ui;
 
 namespace {
 constexpr fui::ActionId ACTION_ROW = 1;
-constexpr int ROW_COUNT = 10;
+constexpr int ROW_COUNT = 15;
+constexpr uint8_t ROW_ORDER[ROW_COUNT] = {0, 3, 4, 5, 2, 10, 11, 12, 13, 14, 1, 6, 7, 8, 9};
+constexpr StrId GRID_LABELS[] = {StrId::STR_LIBRARY_GRID_2_2, StrId::STR_LIBRARY_GRID_3_2, StrId::STR_LIBRARY_GRID_2_3,
+                                 StrId::STR_LIBRARY_GRID_3_3, StrId::STR_LIBRARY_GRID_4_2, StrId::STR_LIBRARY_GRID_2_4,
+                                 StrId::STR_LIBRARY_GRID_4_3, StrId::STR_LIBRARY_GRID_3_4, StrId::STR_LIBRARY_GRID_4_4};
+constexpr StrId SHELF_LABELS[] = {StrId::STR_LIBRARY_SHELF_COZY, StrId::STR_LIBRARY_SHELF_BOTANICAL,
+                                  StrId::STR_LIBRARY_SHELF_OAK, StrId::STR_LIBRARY_SHELF_AUTUMN,
+                                  StrId::STR_LIBRARY_SHELF_UKIYOE};
+constexpr StrId VIEW_LABELS[] = {StrId::STR_LIBRARY_VIEW_SHELF, StrId::STR_LIBRARY_VIEW_COVERS, StrId::STR_LIST_VIEW};
+constexpr StrId BACKGROUND_LABELS[] = {StrId::STR_OFF, StrId::STR_LIBRARY_BACKGROUND_QUIET,
+                                       StrId::STR_LIBRARY_BACKGROUND_ILLUSTRATED};
 }  // namespace
 
 LibrarySettingsActivity::LibrarySettingsActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
@@ -29,7 +40,8 @@ void LibrarySettingsActivity::onEnter() {
 }
 
 void LibrarySettingsActivity::toggle(const int row) {
-  switch (row) {
+  if (row < 0 || row >= ROW_COUNT) return;
+  switch (ROW_ORDER[row]) {
     case 0:
       SETTINGS.libraryUseMetadata = !SETTINGS.libraryUseMetadata;
       break;
@@ -37,10 +49,8 @@ void LibrarySettingsActivity::toggle(const int row) {
       SETTINGS.libraryListExpanded = !SETTINGS.libraryListExpanded;
       break;
     case 2:
-      SETTINGS.recentBooksView = SETTINGS.recentBooksView == CrossPointSettings::RECENT_BOOKS_GRID
-                                     ? CrossPointSettings::RECENT_BOOKS_LIST
-                                     : CrossPointSettings::RECENT_BOOKS_GRID;
-      break;
+      chooseBookView();
+      return;
     case 3:
       SETTINGS.libraryHideFinishedBooks = !SETTINGS.libraryHideFinishedBooks;
       break;
@@ -62,10 +72,78 @@ void LibrarySettingsActivity::toggle(const int row) {
     case 9:
       SETTINGS.libraryShowMarkdown = !SETTINGS.libraryShowMarkdown;
       break;
+    case 10:
+      chooseGridSize();
+      return;
+    case 11:
+      chooseShelfTheme();
+      return;
+    case 12:
+      chooseBackground();
+      return;
+    case 13:
+      SETTINGS.libraryOrnaments = !SETTINGS.libraryOrnaments;
+      break;
+    case 14:
+      SETTINGS.libraryStatusBadges = !SETTINGS.libraryStatusBadges;
+      break;
     default:
       return;
   }
   if (!SETTINGS.saveToFile()) LOG_ERR("LIB", "Cannot save Library settings");
+  requestUpdate();
+}
+
+void LibrarySettingsActivity::chooseBookView() {
+  choicePopup.show(StrId::STR_LIBRARY_BOOK_VIEW, VIEW_LABELS, library_shelf::ViewCount, SETTINGS.libraryBookView,
+                   [this](const int selected) {
+                     if (selected < 0 || selected >= library_shelf::ViewCount) return;
+                     SETTINGS.libraryBookView = static_cast<uint8_t>(selected);
+                     if (!SETTINGS.saveToFile()) LOG_ERR("LIB", "Cannot save Library view");
+                     requestUpdate();
+                   });
+  requestUpdate();
+}
+
+void LibrarySettingsActivity::chooseBackground() {
+  choicePopup.show(StrId::STR_LIBRARY_BACKGROUND, BACKGROUND_LABELS, library_shelf::BackgroundCount,
+                   SETTINGS.libraryBackground, [this](const int selected) {
+                     if (selected < 0 || selected >= library_shelf::BackgroundCount) return;
+                     SETTINGS.libraryBackground = static_cast<uint8_t>(selected);
+                     if (!SETTINGS.saveToFile()) LOG_ERR("LIB", "Cannot save Library background");
+                     requestUpdate();
+                   });
+  requestUpdate();
+}
+
+void LibrarySettingsActivity::chooseGridSize() {
+  choicePopup.show(StrId::STR_LIBRARY_GRID_SIZE, GRID_LABELS, library_shelf::GRID_PRESET_COUNT,
+                   library_shelf::presetIndex(SETTINGS.libraryGridColumns, SETTINGS.libraryGridRows),
+                   [this](const int selected) {
+                     if (selected < 0 || selected >= library_shelf::GRID_PRESET_COUNT) return;
+                     const auto preset = library_shelf::GRID_PRESETS[selected];
+                     if (SETTINGS.libraryGridColumns != preset.columns || SETTINGS.libraryGridRows != preset.rows) {
+                       SETTINGS.libraryGridColumns = preset.columns;
+                       SETTINGS.libraryGridRows = preset.rows;
+                       if (!SETTINGS.saveToFile()) LOG_ERR("LIB", "Cannot save Library grid size");
+                     }
+                     requestUpdate();
+                   });
+  requestUpdate();
+}
+
+void LibrarySettingsActivity::chooseShelfTheme() {
+  choicePopup.show(
+      StrId::STR_LIBRARY_SHELF_THEME, SHELF_LABELS, library_shelf::ThemeCount,
+      SETTINGS.libraryBookshelfTheme < library_shelf::ThemeCount ? SETTINGS.libraryBookshelfTheme : library_shelf::Cozy,
+      [this](const int selected) {
+        if (selected < 0 || selected >= library_shelf::ThemeCount) return;
+        if (SETTINGS.libraryBookshelfTheme != selected) {
+          SETTINGS.libraryBookshelfTheme = static_cast<uint8_t>(selected);
+          if (!SETTINGS.saveToFile()) LOG_ERR("LIB", "Cannot save Library shelf theme");
+        }
+        requestUpdate();
+      });
   requestUpdate();
 }
 
@@ -81,6 +159,7 @@ void LibrarySettingsActivity::onRow(const fui::ActionEvent& event, void* user) {
 
 void LibrarySettingsActivity::loop() {
   RenderLock lock;
+  if (choicePopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
   if (TouchHeaderBackButton::wasTapped(mappedInput, renderer) ||
       mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     finishAfterBackPress();
@@ -143,28 +222,48 @@ void LibrarySettingsActivity::screen(UiApp::ScreenType& screen, void* user) {
 
 void LibrarySettingsActivity::provideRow(void*, const uint16_t row, fui::ListItem& item) {
   static constexpr StrId labels[] = {
-      StrId::STR_LIBRARY_USE_METADATA,   StrId::STR_LIBRARY_LIST_VIEW, StrId::STR_LIBRARY_RECENTLY_OPENED_VIEW,
+      StrId::STR_LIBRARY_USE_METADATA,   StrId::STR_LIBRARY_LIST_VIEW, StrId::STR_LIBRARY_BOOK_VIEW,
       StrId::STR_LIBRARY_FINISHED_BOOKS, StrId::STR_LIBRARY_SERIES,    StrId::STR_LIBRARY_GENRE,
       StrId::STR_LIBRARY_EPUBS,          StrId::STR_LIBRARY_XTC_XTCH,  StrId::STR_LIBRARY_TXT,
-      StrId::STR_LIBRARY_MARKDOWN};
-  item.label = I18N.get(labels[row]);
+      StrId::STR_LIBRARY_MARKDOWN,       StrId::STR_LIBRARY_GRID_SIZE, StrId::STR_LIBRARY_SHELF_THEME,
+      StrId::STR_LIBRARY_BACKGROUND,     StrId::STR_LIBRARY_ORNAMENTS, StrId::STR_LIBRARY_STATUS_BADGES};
+  const uint8_t logical = ROW_ORDER[row];
+  item.label = I18N.get(labels[logical]);
   item.actionValue = static_cast<int16_t>(row);
-  if (row == 1) {
+  if (logical == 1) {
     item.value = SETTINGS.libraryListExpanded ? tr(STR_LIBRARY_EXPANDED) : tr(STR_COMPACT);
     return;
   }
-  if (row == 2) {
+  if (logical == 2) {
+    item.sectionHeading = tr(STR_CAT_DISPLAY);
     item.value =
-        SETTINGS.recentBooksView == CrossPointSettings::RECENT_BOOKS_GRID ? tr(STR_GRID_VIEW) : tr(STR_LIST_VIEW);
+        I18N.get(VIEW_LABELS[SETTINGS.libraryBookView < library_shelf::ViewCount ? SETTINGS.libraryBookView : 0]);
+    return;
+  }
+  if (logical == 10) {
+    item.value =
+        I18N.get(GRID_LABELS[library_shelf::presetIndex(SETTINGS.libraryGridColumns, SETTINGS.libraryGridRows)]);
+    return;
+  }
+  if (logical == 11) {
+    item.value = I18N.get(
+        SHELF_LABELS[SETTINGS.libraryBookshelfTheme < library_shelf::ThemeCount ? SETTINGS.libraryBookshelfTheme
+                                                                                : library_shelf::Cozy]);
+    return;
+  }
+  if (logical == 12) {
+    item.value = I18N.get(
+        BACKGROUND_LABELS[SETTINGS.libraryBackground < library_shelf::BackgroundCount ? SETTINGS.libraryBackground
+                                                                                      : library_shelf::Illustrated]);
     return;
   }
   item.toggle = true;
-  switch (row) {
+  switch (logical) {
     case 0:
+      item.sectionHeading = tr(STR_SETTINGS_SHORT);
       item.toggleChecked = SETTINGS.libraryUseMetadata;
       break;
     case 3:
-      item.sectionHeading = tr(STR_CAT_DISPLAY);
       item.toggleChecked = !SETTINGS.libraryHideFinishedBooks;
       break;
     case 4:
@@ -186,6 +285,12 @@ void LibrarySettingsActivity::provideRow(void*, const uint16_t row, fui::ListIte
     case 9:
       item.toggleChecked = SETTINGS.libraryShowMarkdown;
       break;
+    case 13:
+      item.toggleChecked = SETTINGS.libraryOrnaments;
+      break;
+    case 14:
+      item.toggleChecked = SETTINGS.libraryStatusBadges;
+      break;
   }
 }
 
@@ -195,9 +300,10 @@ void LibrarySettingsActivity::buildScreen(UiApp::ScreenType& screen) {
   renderer.getOrientedViewableTRBL(&bounds[0], &bounds[1], &bounds[2], &bounds[3]);
   const int16_t headerBottom =
       static_cast<int16_t>(metrics.topPadding + TouchHeaderBackButton::height(metrics, mappedInput));
-  screen.setContentMarginFromScreen(fui::Insets{headerBottom, static_cast<int16_t>(bounds[1]),
-                                                static_cast<int16_t>(metrics.buttonHintsHeight + bounds[2]),
-                                                static_cast<int16_t>(bounds[3])});
+  screen.setContentMarginFromScreen(
+      fui::Insets{headerBottom, static_cast<int16_t>(bounds[1]),
+                  static_cast<int16_t>((mappedInput.hasTouchHardware() ? 0 : metrics.buttonHintsHeight) + bounds[2]),
+                  static_cast<int16_t>(bounds[3])});
   fui::ListProps props;
   props.rowProvider = &LibrarySettingsActivity::provideRow;
   props.rowProviderCtx = this;
@@ -235,8 +341,10 @@ void LibrarySettingsActivity::render(RenderLock&&) {
     if (!listNav.consumeRebuildNeeded()) break;
   }
   uiReady = true;
+  if (choicePopup.processRender(renderer, mappedInput)) return;
   const auto labels =
       mappedInput.mapLabels(mappedInput.withBackArrow(tr(STR_BACK)), tr(STR_SELECT), tr(STR_DIR_UP), tr(STR_DIR_DOWN));
-  GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
+  if (!mappedInput.hasTouchHardware())
+    GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   renderer.displayBuffer();
 }

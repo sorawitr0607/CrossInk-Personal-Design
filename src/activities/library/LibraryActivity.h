@@ -4,11 +4,13 @@
 #include <FreeInkUIGfxRenderer.h>
 #include <LibraryBuilder.h>
 #include <LibraryIndexFile.h>
+#include <LibrarySort.h>
 
 #include <memory>
 #include <string>
 
 #include "LibraryInputBuffer.h"
+#include "LibraryShelfLayout.h"
 #include "RecentBooksStore.h"
 #include "activities/Activity.h"
 #include "components/OptionPopup.h"
@@ -29,6 +31,8 @@ class LibraryActivity final : public Activity {
   int simulatorRowCount() const { return rowCount(); }
   bool simulatorReadBook(int row, RecentBook& book) { return readBook(row, book); }
   void simulatorSetView(uint8_t method, bool reverse, const std::string& search = "") {
+    collectionsVisible = false;
+    collectionScope = CollectionKind::All;
     sort = static_cast<Sort>(method);
     descending = reverse;
     query = search;
@@ -40,9 +44,70 @@ class LibraryActivity final : public Activity {
 
  private:
   enum class Sort : uint8_t { DateAdded, Title, AuthorLast, AuthorFirst, RecentlyRead, Series, Genre };
+  enum class CollectionKind : uint8_t { All, Series, Authors, Folders };
+  struct CollectionSlot {
+    uint16_t leader = 0;
+    uint16_t count = 0;
+    uint16_t completed = 0;
+    uint16_t covers[3]{};
+  };
+  static_assert(sizeof(CollectionSlot) == 12, "Collection cache holds references, not book metadata");
+  // One 12-byte slot per potential group, held in PSRAM through the existing
+  // BookArray allocator when available. No full-library strings or bitmaps.
+  // Allocation failure leaves All Books accessible rather than aborting.
+  library::BookArray<CollectionSlot> collections;
+  uint16_t collectionCapacity = 0;
+  uint16_t collectionCount = 0;
+  CollectionKind collectionTab = CollectionKind::Series;
+  CollectionKind collectionScope = CollectionKind::All;
+  bool collectionsVisible = true;
+  bool collectionsFailed = false;
+  int collectionPageStart = 0;
+  int collectionSelection = 0;
+  int loadedCollectionPage = -1;
+  int nextCollectionCover = 0;
+  int16_t collectionCoverWidth = 0;
+  int16_t collectionCoverHeight = 0;
+  bool collectionCoversChanged = false;
+  bool gridCoversChanged = false;
+  uint16_t allBookCovers[3]{};
+  uint8_t allBookCoverCount = 0;
+  uint16_t allCompleted = 0;
+  // Two bits per indexed book: known + finished. Loaded once per Library visit,
+  // reused across tabs/sorts, invalidated by Refresh and existing book actions.
+  library::BookArray<uint8_t> completionBits;
+  uint16_t completionBookCount = 0;
+  bool completionUnavailable = false;
+  // One finished bit per current sorted/filtered row, plus u16 page starts.
+  // Prefer PSRAM, bound to the index ceiling, release all onExit.
+  library::BookArray<uint8_t> rowCompletion;
+  library::BookArray<uint16_t> bookPages;
+  int bookPageCount = 1;
+  int bookPageIndex = 0;
+  int pageCacheWidth = 0, pageCacheHeight = 0;
+  bool pageCacheValid = false;
+  bool pageCacheFallback = false;
+  struct BookCell {
+    int16_t row, x, y, width, height, line;
+    bool spine, completed;
+  };
+  BookCell bookCells[library_shelf::MAX_VISIBLE_BOOKS]{};
+  int8_t pageProgress[library_shelf::MAX_VISIBLE_BOOKS]{};
+  uint8_t visibleBookCount = 0;
+  uint8_t nextProgressSlot = 0;
+  bool pageProgressChanged = false;
+  // Reused across scans/draws; never retain a title or thumbnail for every book.
+  std::string collectionKey;
+  std::string collectionTitle;
+  std::string collectionScratch;
+  std::string thumbnailScratch;
+  // Existing index lookup API batches 16 histories per scan. Keep its 288-byte
+  // scratch in the activity rather than adding it to the small task stack.
+  library::BookIdentity recentIdentities[library::LibraryIndexFile::MAX_IDENTITY_LOOKUPS]{};
+  uint16_t recentIdentityRows[library::LibraryIndexFile::MAX_IDENTITY_LOOKUPS]{};
   // Touch header controls precede the book rows; button-only navigation visits books directly.
-  static constexpr int CONTROL_COUNT = 5;
-  using UiApp = freeink::ui::FreeInkApp<32, 4>;
+  static constexpr int CONTROL_COUNT = 8;
+  using UiApp = freeink::ui::FreeInkApp<48, 4>;
   freeink::ui::GfxRendererTarget uiTarget;
   UiApp app;
   ButtonNavigator buttonNavigator;
@@ -59,8 +124,6 @@ class LibraryActivity final : public Activity {
   int nextGridCoverRow = -1;
   int16_t gridCoverWidth = 0;
   int16_t gridCoverHeight = 0;
-  int gridProgressRow = -1;
-  float gridProgress = -1.0f;
   bool uiReady = false;
   bool initialScanPending = false;
   bool confirmLongPressCaptured = false;
@@ -113,12 +176,38 @@ class LibraryActivity final : public Activity {
   static void listScreen(UiApp::ScreenType& screen, void* user);
   static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onControlEvent(const freeink::ui::ActionEvent& event, void* user);
+  static void onCollectionEvent(const freeink::ui::ActionEvent& event, void* user);
   static void provideRow(void* user, uint16_t row, freeink::ui::ListItem& item);
   void buildListScreen(UiApp::ScreenType& screen);
   void buildGrid(UiApp::ScreenType& screen);
+  void invalidateBookPages();
+  void ensureBookPages(int width, int height);
+  bool completedOrdinal(uint16_t ordinal);
+  bool completedRow(int row);
+  void invalidateCompletion();
+  int pageStartForRow(int row) const;
+  void moveBookPage(int direction);
+  void drawBookPager(UiApp::ScreenType& screen, const freeink::ui::Rect& area, int current, int total);
+  void drawBookLabel(const char* text, int font, int x, int y, int width, bool centered = false);
+  void buildCollectionScreen(UiApp::ScreenType& screen);
+  void buildCollections();
+  void enterCollections(CollectionKind tab);
+  void enterCollection(int slot);
+  void returnToCollections();
+  void handleCollectionInput(const LibraryInputBuffer::Event& input);
+  bool readCollectionValue(const library::ClixRecord& record, CollectionKind kind, std::string& value);
+  bool matchesCollection(const library::ClixRecord& record);
+  bool readIndexedBook(uint16_t ordinal, RecentBook& book);
+  bool collectionLabel(const CollectionSlot& slot, std::string& value);
+  void loadCollectionPageCovers();
+  void changeCollectionPage(int direction);
+  int gridColumns() const;
+  int gridRows() const;
+  int gridPageSize() const;
+  void cachedThumbnailPath(const RecentBook& book, int width, int height, std::string& out) const;
+  bool drawCachedCover(const RecentBook& book, int x, int y, int width, int height);
+  bool prepareCover(const RecentBook& book, int width, int height);
   void loadGridPageCovers();
-  bool loadGridCover(int row);
-  void loadGridProgress();
   bool gridEnabled() const;
   void buildSortHeader(UiApp::ScreenType& screen);
   const char* sortLabel() const;
@@ -157,4 +246,7 @@ class LibraryActivity final : public Activity {
   void promptDeleteBook(const RecentBook& book);
   void promptRemoveBook(const std::string& path, const std::string& title);
   void showBookActionMenu(size_t bookIndex, bool ignoreInitialConfirmRelease = false);
+#ifdef SIMULATOR
+  void runSimulatorLibraryReview();
+#endif
 };

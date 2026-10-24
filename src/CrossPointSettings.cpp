@@ -474,6 +474,13 @@ void CrossPointSettings::toJson(JsonDocument& doc) const {
   doc["librarySortMethod"] = librarySortMethod;
   doc["librarySortDescending"] = librarySortDescending;
   doc["libraryListExpanded"] = libraryListExpanded;
+  doc["libraryBookView"] = libraryBookView;
+  doc["libraryGridColumns"] = libraryGridColumns;
+  doc["libraryGridRows"] = libraryGridRows;
+  doc["libraryBookshelfTheme"] = libraryBookshelfTheme;
+  doc["libraryBackground"] = libraryBackground;
+  doc["libraryOrnaments"] = libraryOrnaments;
+  doc["libraryStatusBadges"] = libraryStatusBadges;
   doc["recentBooksView"] = recentBooksView;
   doc["libraryShowSeries"] = libraryShowSeries;
   doc["libraryShowGenre"] = libraryShowGenre;
@@ -667,6 +674,20 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc, bool importingCrossPoint
   readLibraryChoice("librarySortMethod", librarySortMethod, 7);
   readLibraryChoice("librarySortDescending", librarySortDescending, 2);
   readLibraryChoice("libraryListExpanded", libraryListExpanded, 2);
+  libraryBookView = 0;
+  libraryGridColumns = 3;
+  libraryGridRows = 2;
+  libraryBookshelfTheme = 0;
+  libraryBackground = 2;
+  libraryOrnaments = doc["libraryOrnaments"] | true;
+  libraryStatusBadges = doc["libraryStatusBadges"] | true;
+  readLibraryChoice("libraryBookView", libraryBookView, 3);
+  readLibraryChoice("libraryGridColumns", libraryGridColumns, 5);
+  readLibraryChoice("libraryGridRows", libraryGridRows, 5);
+  readLibraryChoice("libraryBookshelfTheme", libraryBookshelfTheme, 5);
+  readLibraryChoice("libraryBackground", libraryBackground, 3);
+  if (libraryGridColumns < 2) libraryGridColumns = 3;
+  if (libraryGridRows < 2) libraryGridRows = 2;
   // A missing or corrupt legacy choice uses List, even if this object loaded another document earlier.
   recentBooksView = RECENT_BOOKS_LIST;
   readLibraryChoice("recentBooksView", recentBooksView, RECENT_BOOKS_VIEW_COUNT);

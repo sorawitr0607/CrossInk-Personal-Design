@@ -1215,6 +1215,11 @@ class SimulatorSmokeTest {
 
   void tickImpl() {
     mappedInputManager.simulatorClearInputFrame();
+    if (std::getenv("CROSSINK_LIBRARY_REVIEW")) {
+      // Dedicated Library review owns its isolated fixtures and exits onEnter.
+      activityManager.goToLibrary();
+      return;
+    }
 
     if (settleFrames > 0) {
       --settleFrames;

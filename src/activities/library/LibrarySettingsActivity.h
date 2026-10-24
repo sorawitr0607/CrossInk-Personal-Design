@@ -4,6 +4,7 @@
 #include <FreeInkUIGfxRenderer.h>
 
 #include "activities/Activity.h"
+#include "components/OptionPopup.h"
 #include "util/ButtonNavigator.h"
 
 class LibrarySettingsActivity final : public Activity {
@@ -12,12 +13,14 @@ class LibrarySettingsActivity final : public Activity {
   void onEnter() override;
   void loop() override;
   void render(RenderLock&&) override;
+  bool blocksGlobalInput() const override { return choicePopup.isActive(); }
 
  private:
   using UiApp = freeink::ui::FreeInkApp<16, 2>;
   freeink::ui::GfxRendererTarget uiTarget;
   UiApp app;
   ButtonNavigator buttonNavigator;
+  OptionPopup choicePopup;
   freeink::ui::ListNav listNav;
   int selection = 0;
   int topIndex = 0;
@@ -30,4 +33,8 @@ class LibrarySettingsActivity final : public Activity {
   static void provideRow(void* user, uint16_t row, freeink::ui::ListItem& item);
   void buildScreen(UiApp::ScreenType& screen);
   void toggle(int row);
+  void chooseGridSize();
+  void chooseShelfTheme();
+  void chooseBookView();
+  void chooseBackground();
 };

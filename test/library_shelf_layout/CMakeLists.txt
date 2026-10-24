@@ -1,0 +1,3 @@
+add_executable(library_shelf_layout_test LibraryShelfLayoutTest.cpp)
+target_link_libraries(library_shelf_layout_test PRIVATE crosspoint_test_common)
+add_test(NAME library_shelf_layout COMMAND library_shelf_layout_test)

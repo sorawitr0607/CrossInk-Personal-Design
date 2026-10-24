@@ -633,6 +633,14 @@ class CrossPointSettings : public PersistableStore<CrossPointSettings> {
   uint8_t librarySortMethod = 4;
   uint8_t librarySortDescending = 1;
   uint8_t libraryListExpanded = 1;
+  // Library-only layout: do not reuse Home's recentBooksView preference.
+  uint8_t libraryBookView = 0;  // Library-only: Shelf, Covers, List (independent of Home).
+  uint8_t libraryGridColumns = 3;
+  uint8_t libraryGridRows = 2;
+  uint8_t libraryBookshelfTheme = 0;
+  uint8_t libraryBackground = 2;
+  bool libraryOrnaments = true;
+  bool libraryStatusBadges = true;
   uint8_t libraryShowSeries = 1;
   uint8_t libraryShowGenre = 1;
   uint8_t libraryShowEpub = 1;

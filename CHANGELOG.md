@@ -1,3 +1,19 @@
+## [Unreleased] - Custom X4 Pro Library
+
+### Added
+
+- Open Library to Series, Authors, and SD Folder collections with stacked cover thumbnails and an All Books shortcut.
+- Choose a Library-only book grid from 2 x 2 to 4 x 4, plus Shelf, Covers and List views for every sort.
+- Use five illustrated bookshelf themes: Cozy Nook, Botanical, Oak Study, Autumn Harvest and Ukiyo-e Print, with independent backgrounds, ornaments and status badges.
+
+### Changed
+
+- Use the book grid with every Library sort, defaulting to Series when opening a collection.
+- Keep Library Search, manual Refresh, Settings, Display, and Show Files controls; retain collection scope when sorting.
+- Prepare visible cover thumbnails one at a time and batch the resulting repaint. Browsing covers does not mark books as opened.
+- Show finished books as compact spines in Shelf view, using existing statistics without changing reading data.
+- Retain single-tap collections, add tap-to-select books, and provide first/previous/next/last paging without a touch-device button hint strip.
+
 ## [v1.6.1] - 2026-10-03
 
 ### Added

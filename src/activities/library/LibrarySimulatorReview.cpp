@@ -1,0 +1,151 @@
+// Native simulator verification only. No code or fixture writes in firmware.
+#ifdef SIMULATOR
+#include <ArduinoJson.h>
+#include <Epub.h>
+#include <HalStorage.h>
+
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+
+#include "LibraryActivity.h"
+#include "activities/reader/BookReadingStats.h"
+
+void LibraryActivity::runSimulatorLibraryReview() {
+  const char* output = std::getenv("CROSSINK_LIBRARY_REVIEW");
+  if (!output) return;
+  unsigned checks = 0, captures = 0;
+  const auto check = [&](const bool passed, const char* reason) {
+    ++checks;
+    if (passed) return;
+    std::fprintf(stderr, "LIBRARY REVIEW FAIL: %s\n", reason);
+    std::fflush(stderr);
+    std::exit(2);
+  };
+  std::filesystem::create_directories(output);
+  const auto recentCountBefore = RECENT_BOOKS.getCount();
+  check(index.bookCount() >= 20, "Missing generated LibraryReview fixtures");
+  // These are generated books in a temporary simulator card, never the user's
+  // SD card. Refuse the review before writing a single fixture statistic.
+  for (int i = 0; i < index.bookCount(); ++i)
+    check(readIndexedBook(i, rowScratch) && rowScratch.path.rfind("/LibraryReview/", 0) == 0,
+          "Review must run with an isolated generated card");
+  for (int i = 0; i < index.bookCount(); ++i) {
+    check(readIndexedBook(i, rowScratch), "Cannot read fixture");
+    const auto cache = Epub::resolveCachePathForFilePath(rowScratch.path, "/.crosspoint");
+    if (!Storage.exists(cache.c_str())) Storage.mkdir(cache.c_str());
+    BookReadingStats stats;
+    stats.isCompleted = i % 3 == 0;
+    check(stats.save(cache), "Cannot save fixture finished state");
+  }
+  invalidateCompletion();
+  const auto paint = [&] {
+    RenderLock lock;
+    render(std::move(lock));
+  };
+  const auto settle = [&] {
+    paint();
+    for (int i = 0; i < 72; ++i) {
+      RenderLock lock;
+      if (collectionsVisible)
+        loadCollectionPageCovers();
+      else
+        loadGridPageCovers();
+    }
+    paint();
+  };
+  const auto capture = [&](const char* name) {
+    settle();
+    RenderLock lock;
+    const auto path = std::filesystem::path(output) / (std::string(name) + ".pgm");
+    FILE* image = std::fopen(path.c_str(), "wb");
+    check(image != nullptr, "Cannot create capture");
+    std::fprintf(image, "P5\n%d %d\n255\n", renderer.getScreenWidth(), renderer.getScreenHeight());
+    for (int y = 0; y < renderer.getScreenHeight(); ++y)
+      for (int x = 0; x < renderer.getScreenWidth(); ++x) std::fputc(renderer.isPixelBlack(x, y) ? 0 : 255, image);
+    std::fclose(image);
+    ++captures;
+  };
+  char name[80];
+  for (uint8_t theme = 0; theme < library_shelf::ThemeCount; ++theme) {
+    SETTINGS.libraryBookshelfTheme = theme;
+    SETTINGS.libraryBackground = library_shelf::Illustrated;
+    SETTINGS.libraryOrnaments = true;
+    SETTINGS.libraryStatusBadges = true;
+    SETTINGS.libraryGridColumns = 3;
+    SETTINGS.libraryGridRows = 2;
+    enterCollections(CollectionKind::Series);
+    check(collectionCount >= 3 && allCompleted > 0, "Metadata groups and real finished counts");
+    snprintf(name, sizeof(name), "theme-%u-collections", theme);
+    capture(name);
+    for (uint8_t view = 0; view < library_shelf::ViewCount; ++view) {
+      SETTINGS.libraryBookView = view;
+      enterCollection(-1);
+      check(sort == Sort::Series && !descending, "Collections start with Series ascending");
+      snprintf(name, sizeof(name), "theme-%u-view-%u", theme, view);
+      capture(name);
+      check(visibleBookCount > 0 && visibleBookCount <= library_shelf::MAX_VISIBLE_BOOKS, "Visible hit budget");
+      check(bookPageCount > 1, "Fixture exercises multiple book pages");
+      moveBookPage(2);
+      paint();
+      check(bookPageIndex == bookPageCount - 1, "Last page");
+      moveBookPage(-2);
+      paint();
+      check(bookPageIndex == 0, "First page");
+      for (const auto preset : library_shelf::GRID_PRESETS) {
+        SETTINGS.libraryGridColumns = preset.columns;
+        SETTINGS.libraryGridRows = preset.rows;
+        resetViewport();
+        paint();
+        check(visibleBookCount > 0 && visibleBookCount <= library_shelf::MAX_VISIBLE_BOOKS, "Every grid/view draws");
+        for (int i = 0; i < visibleBookCount; ++i) {
+          const auto& cell = bookCells[i];
+          check(cell.x >= 0 && cell.y >= 0 && cell.x + cell.width <= renderer.getScreenWidth() &&
+                    cell.y + cell.height <= renderer.getScreenHeight(),
+                "Cover stays within display");
+        }
+      }
+    }
+  }
+  SETTINGS.libraryBookView = library_shelf::Shelf;
+  SETTINGS.libraryBookshelfTheme = library_shelf::Cozy;
+  SETTINGS.libraryGridColumns = 3;
+  SETTINGS.libraryGridRows = 2;
+  enterCollections(CollectionKind::Authors);
+  capture("authors");
+  check(collectionCount >= 2, "Authors tab");
+  enterCollections(CollectionKind::Folders);
+  capture("folders");
+  check(collectionCount >= 2, "SD folders tab");
+  enterCollections(CollectionKind::Series);
+  enterCollection(0);
+  const int scopedCount = rowCount();
+  check(scopedCount > 0 && scopedCount < index.bookCount(), "Collection membership filter");
+  capture("inside-collection");
+  for (uint8_t method = 0; method < 7; ++method) {
+    simulatorSetView(method, false);
+    paint();
+    check(SETTINGS.libraryBookView == library_shelf::Shelf, "Sort preserves selected view");
+  }
+  simulatorSetView(1, false, "Volume 02");
+  check(rowCount() > 0 && rowCount() < index.bookCount(), "Search returns matching fixtures");
+  capture("search");
+  for (uint8_t mode = 0; mode < library_shelf::BackgroundCount; ++mode) {
+    SETTINGS.libraryBackground = mode;
+    resetViewport();
+    snprintf(name, sizeof(name), "background-%u", mode);
+    capture(name);
+  }
+  JsonDocument saved;
+  SETTINGS.toJson(saved);
+  SETTINGS.libraryBookView = library_shelf::List;
+  SETTINGS.libraryBookshelfTheme = library_shelf::Autumn;
+  SETTINGS.fromJson(saved.as<JsonVariantConst>());
+  check(SETTINGS.libraryBookView == library_shelf::Shelf && SETTINGS.libraryBookshelfTheme == library_shelf::Cozy,
+        "Library settings round trip");
+  check(RECENT_BOOKS.getCount() == recentCountBefore, "Unopened covers never enter recent history");
+  std::printf("LIBRARY REVIEW PASS: %u checks, %u native captures\n", checks, captures);
+  std::fflush(stdout);
+  std::exit(0);
+}
+#endif
