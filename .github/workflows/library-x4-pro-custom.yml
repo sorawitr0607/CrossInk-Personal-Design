@@ -66,6 +66,7 @@ jobs:
           mkdir -p build artifacts/native-library-review
           sudo apt-get update
           sudo apt-get install -y libsdl2-dev
+          python scripts/review_library_simulator.py --fixtures-only
           pio run -j2 -e x4-pro-simulator | tee build/library-simulator.log
           python scripts/review_library_simulator.py
 

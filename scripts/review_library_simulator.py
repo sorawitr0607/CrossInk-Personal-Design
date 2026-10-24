@@ -23,7 +23,8 @@ def fixture(path, number):
     draw.rectangle((4, 4, 145, 220), outline=ink, width=2)
     draw.rectangle((8, 8, 141, 216), outline=ink)
     font = ImageFont.truetype(str(ROOT / "lib/EpdFont/scalableFonts/bitter_regular.ttf"), 14)
-    draw.text((75, 50), series.replace(" ", "\n", 1), font=font, fill=ink, anchor="mt", align="center")
+    for line_number, line in enumerate(series.split(" ", 1)):
+        draw.text((75, 50 + line_number * 19), line, font=font, fill=ink, anchor="mt")
     draw.ellipse((61, 107, 89, 137), outline=ink, width=2)
     draw.line((75, 137, 75, 161), fill=ink, width=2)
     draw.text((75, 180), f"Volume {number // 4 + 1:02}", font=font, fill=ink, anchor="mt")
@@ -58,6 +59,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--env", default="x4-pro-simulator")
     parser.add_argument("--output", default="artifacts/native-library-review")
+    parser.add_argument("--fixtures-only", action="store_true", help="Check the generated card before compiling")
     args = parser.parse_args()
     program = ROOT / ".pio/build" / args.env / "program"
     output = Path(args.output).resolve()
@@ -66,6 +68,9 @@ def main():
         card = Path(temporary)
         for i in range(38):
             fixture(card / "fs_/LibraryReview" / ("Fables" if i % 2 else "Stories") / f"book-{i:02}.epub", i)
+        if args.fixtures_only:
+            print("Generated 38 isolated EPUB fixtures successfully")
+            return
         environment = dict(os.environ, SDL_VIDEODRIVER="dummy", CROSSINK_SIMULATOR_SMOKE_TEST="1",
                            CROSSINK_LIBRARY_REVIEW=str(output))
         try:
