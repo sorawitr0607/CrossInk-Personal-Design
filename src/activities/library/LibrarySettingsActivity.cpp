@@ -117,18 +117,8 @@ void LibrarySettingsActivity::chooseBackground() {
 }
 
 void LibrarySettingsActivity::chooseGridSize() {
-  choicePopup.show(StrId::STR_LIBRARY_GRID_SIZE, GRID_LABELS, library_shelf::GRID_PRESET_COUNT,
-                   library_shelf::presetIndex(SETTINGS.libraryGridColumns, SETTINGS.libraryGridRows),
-                   [this](const int selected) {
-                     if (selected < 0 || selected >= library_shelf::GRID_PRESET_COUNT) return;
-                     const auto preset = library_shelf::GRID_PRESETS[selected];
-                     if (SETTINGS.libraryGridColumns != preset.columns || SETTINGS.libraryGridRows != preset.rows) {
-                       SETTINGS.libraryGridColumns = preset.columns;
-                       SETTINGS.libraryGridRows = preset.rows;
-                       if (!SETTINGS.saveToFile()) LOG_ERR("LIB", "Cannot save Library grid size");
-                     }
-                     requestUpdate();
-                   });
+  gridSelection = library_shelf::presetIndex(SETTINGS.libraryGridColumns, SETTINGS.libraryGridRows);
+  gridChooser = true;
   requestUpdate();
 }
 
@@ -149,6 +139,10 @@ void LibrarySettingsActivity::chooseShelfTheme() {
 
 void LibrarySettingsActivity::onRow(const fui::ActionEvent& event, void* user) {
   auto* self = static_cast<LibrarySettingsActivity*>(user);
+  if (self->gridChooser && event.value >= 100 && event.value < 100 + library_shelf::GRID_PRESET_COUNT) {
+    self->applyGridPreset(event.value - 100);
+    return;
+  }
   if (event.value < 0 || event.value >= ROW_COUNT) return;
   self->selection = event.value;
   self->showSelection = false;
@@ -162,7 +156,13 @@ void LibrarySettingsActivity::loop() {
   if (choicePopup.handleInput(mappedInput, [this] { requestUpdate(); })) return;
   if (TouchHeaderBackButton::wasTapped(mappedInput, renderer) ||
       mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-    finishAfterBackPress();
+    if (gridChooser) {
+      gridChooser = false;
+      mappedInput.suppressNextBackRelease();
+      requestUpdate();
+    } else {
+      finishAfterBackPress();
+    }
     return;
   }
   if (ignoreConfirmRelease) {
@@ -181,7 +181,21 @@ void LibrarySettingsActivity::loop() {
     }
   }
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    toggle(selection);
+    if (gridChooser)
+      applyGridPreset(gridSelection);
+    else
+      toggle(selection);
+    return;
+  }
+  if (gridChooser) {
+    buttonNavigator.onNextRelease([&] {
+      gridSelection = ButtonNavigator::nextIndex(gridSelection, library_shelf::GRID_PRESET_COUNT);
+      requestUpdate();
+    });
+    buttonNavigator.onPreviousRelease([&] {
+      gridSelection = ButtonNavigator::previousIndex(gridSelection, library_shelf::GRID_PRESET_COUNT);
+      requestUpdate();
+    });
     return;
   }
   const auto swipe = mappedInput.wasSwipe();
@@ -304,6 +318,10 @@ void LibrarySettingsActivity::buildScreen(UiApp::ScreenType& screen) {
       fui::Insets{headerBottom, static_cast<int16_t>(bounds[1]),
                   static_cast<int16_t>((mappedInput.hasTouchHardware() ? 0 : metrics.buttonHintsHeight) + bounds[2]),
                   static_cast<int16_t>(bounds[3])});
+  if (gridChooser) {
+    drawGridChooser(screen);
+    return;
+  }
   fui::ListProps props;
   props.rowProvider = &LibrarySettingsActivity::provideRow;
   props.rowProviderCtx = this;
@@ -332,10 +350,11 @@ void LibrarySettingsActivity::render(RenderLock&&) {
   for (int pass = 0; pass < 8; ++pass) {
     renderer.clearScreen();
     const auto header = TouchHeaderBackButton::headerRect(renderer, mappedInput);
+    const char* heading = gridChooser ? tr(STR_LIBRARY_GRID_SIZE) : tr(STR_LIBRARY_SETTINGS);
     if (mappedInput.hasTouchHardware())
-      TouchHeaderBackButton::draw(renderer, uiTarget, header, tr(STR_LIBRARY_SETTINGS), false);
+      TouchHeaderBackButton::draw(renderer, uiTarget, header, heading, false);
     else
-      GUI.drawHeader(renderer, header, tr(STR_LIBRARY_SETTINGS));
+      GUI.drawHeader(renderer, header, heading);
     app.render();
     topIndex = listNav.top;
     if (!listNav.consumeRebuildNeeded()) break;

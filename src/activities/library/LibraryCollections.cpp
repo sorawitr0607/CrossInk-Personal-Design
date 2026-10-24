@@ -395,6 +395,7 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
   for (int line = 0; line < 2; ++line) {
     const int floor = area.y + (line + 1) * cellHeight - 80;
     library_shelf::drawPlank(renderer, theme, area.x + 4, floor, area.width - 8, false);
+    library_shelf::drawPlank(renderer, theme, area.x + 4, floor, area.width - 8, true);
   }
   for (int visible = 0; visible < COLLECTIONS_PER_PAGE; ++visible) {
     const int groupIndex = collectionPageStart + visible;
@@ -438,10 +439,6 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
     screen.frame().hit(fui::Rect{static_cast<int16_t>(cx), static_cast<int16_t>(area.y + line * cellHeight),
                                  static_cast<int16_t>(cellWidth), static_cast<int16_t>(cellHeight)},
                        ACTION_COLLECTION, static_cast<int16_t>(visible + 1), fui::InputTouch);
-  }
-  for (int line = 0; line < 2; ++line) {
-    const int floor = area.y + (line + 1) * cellHeight - 80;
-    library_shelf::drawPlank(renderer, theme, area.x + 4, floor, area.width - 8, true);
   }
   if (collectionCount == 0)
     drawBookLabel(collectionsFailed ? tr(STR_LIBRARY_SEARCH_FAILED) : tr(STR_LIBRARY_EMPTY), SMALL_FONT_ID, area.x + 10,

@@ -14,6 +14,11 @@ class LibrarySettingsActivity final : public Activity {
   void loop() override;
   void render(RenderLock&&) override;
   bool blocksGlobalInput() const override { return choicePopup.isActive(); }
+#ifdef SIMULATOR
+  void simulatorOpenGrid() { chooseGridSize(); }
+  void simulatorShowFiles() { topIndex = 11; }
+  void simulatorApplyGrid(int preset) { applyGridPreset(preset); }
+#endif
 
  private:
   using UiApp = freeink::ui::FreeInkApp<16, 2>;
@@ -27,6 +32,8 @@ class LibrarySettingsActivity final : public Activity {
   bool showSelection = true;
   bool uiReady = false;
   bool ignoreConfirmRelease = false;
+  bool gridChooser = false;
+  int gridSelection = 1;
 
   static void screen(UiApp::ScreenType& screen, void* user);
   static void onRow(const freeink::ui::ActionEvent& event, void* user);
@@ -37,4 +44,6 @@ class LibrarySettingsActivity final : public Activity {
   void chooseShelfTheme();
   void chooseBookView();
   void chooseBackground();
+  void applyGridPreset(int selected);
+  void drawGridChooser(UiApp::ScreenType& screen);
 };

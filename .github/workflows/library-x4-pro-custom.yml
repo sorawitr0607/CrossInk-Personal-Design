@@ -60,11 +60,28 @@ jobs:
           mkdir -p artifacts
           git diff --binary "$CROSSINK_LIBRARY_BASE" -- . > artifacts/source.patch
 
+      - name: Verify native X4 Pro Library screens
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y libsdl2-dev
+          pio run -j2 -e x4-pro-simulator | tee build/library-simulator.log
+          python scripts/review_library_simulator.py
+
+      - name: Upload native screen review
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: library-native-screen-review
+          path: artifacts/native-library-review/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Run the native checks
         run: |
           set -euo pipefail
           cmake -S test -B build/library-native -DCMAKE_BUILD_TYPE=Release
-          cmake --build build/library-native --parallel 2
+          cmake --build build/library-native --parallel 4
           ctest --test-dir build/library-native --output-on-failure
 
       - uses: actions/cache@v4
@@ -92,14 +109,6 @@ jobs:
         run: |
           set -euo pipefail
           pio run -j2 -e x4-pro | tee build/library-x4-pro.log
-
-      - name: Verify native X4 Pro Library screens
-        run: |
-          set -euo pipefail
-          sudo apt-get update
-          sudo apt-get install -y libsdl2-dev
-          pio run -j2 -e x4-pro-simulator | tee build/library-simulator.log
-          python scripts/review_library_simulator.py
 
       - name: Package the X4 Pro application image
         run: python scripts/package_library_firmware.py

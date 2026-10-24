@@ -57,6 +57,7 @@ struct ShelfCursor {
   int x = 0;
   int line = 0;
   int count = 0;
+  int lineCount = 0;
 };
 struct Placement {
   int x, line, width;
@@ -68,14 +69,16 @@ inline bool place(ShelfCursor& cursor, const Geometry& geometry, const int width
                   Placement& out) {
   if (cursor.count >= MAX_VISIBLE_BOOKS) return false;
   const int itemWidth = spine ? spineWidth(geometry) : geometry.cellWidth;
-  if (cursor.x > 0 && cursor.x + itemWidth > width) {
+  if (cursor.x > 0 && (cursor.x + itemWidth > width || cursor.lineCount >= MAX_VISIBLE_BOOKS / geometry.rows)) {
     cursor.x = 0;
+    cursor.lineCount = 0;
     ++cursor.line;
   }
   if (cursor.line >= geometry.rows) return false;
   out = {cursor.x, cursor.line, itemWidth};
   cursor.x += itemWidth + gap;
   ++cursor.count;
+  ++cursor.lineCount;
   return true;
 }
 

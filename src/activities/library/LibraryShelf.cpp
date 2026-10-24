@@ -22,7 +22,6 @@ constexpr fui::ActionId ACTION_ROW = 1;
 constexpr fui::ActionId ACTION_COLLECTION = 3;
 constexpr int PAGE_PREVIOUS = 200, PAGE_NEXT = 201, PAGE_FIRST = 202, PAGE_LAST = 203;
 constexpr int GAP = 8;
-constexpr int LABEL_HEIGHT = 44;
 }  // namespace
 
 void LibraryActivity::invalidateCompletion() {
@@ -85,8 +84,12 @@ void LibraryActivity::ensureBookPages(const int width, const int height) {
   pageCacheHeight = height;
   const int count = rowCount();
   const bool list = SETTINGS.libraryBookView == library_shelf::List;
+  const bool dense = library_shelf::rows(SETTINGS.libraryGridRows) >= 3;
+  const int labelHeight = dense ? 22 : 44;
+  const int plankSpace = dense ? 22 : 30;
+  const int headroom = dense ? 0 : 18;
   const auto geometry = library_shelf::geometry(width, height, SETTINGS.libraryGridColumns, SETTINGS.libraryGridRows,
-                                                GAP, 7, LABEL_HEIGHT + 30);
+                                                GAP, 7, labelHeight + plankSpace + headroom);
   const int minimumPageSize = list ? gridPageSize() : geometry.columns * geometry.rows;
   const int capacity = library_shelf::pageCount(count, minimumPageSize) + 1;
   // At the index ceiling: <=16 KiB page starts (2x2), <=4 KiB row status.
@@ -222,8 +225,12 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
                 BITTER_10_FONT_ID, caption.x + 12, caption.y + 2, caption.width - 24);
   library_shelf::drawWall(renderer, SETTINGS.libraryBookshelfTheme, SETTINGS.libraryBackground, area.x, area.y,
                           area.width, area.height);
+  const bool dense = library_shelf::rows(SETTINGS.libraryGridRows) >= 3;
+  const int labelHeight = dense ? 22 : 44;
+  const int plankSpace = dense ? 22 : 30;
+  const int headroom = dense ? 0 : 18;
   const auto geometry = library_shelf::geometry(area.width, area.height, SETTINGS.libraryGridColumns,
-                                                SETTINGS.libraryGridRows, GAP, 7, LABEL_HEIGHT + 30);
+                                                SETTINGS.libraryGridRows, GAP, 7, labelHeight + plankSpace + headroom);
   const int coverWidth = list ? 30 : geometry.coverWidth;
   const int coverHeight = list ? 44 : geometry.coverHeight;
   if (coverWidth != gridCoverWidth || coverHeight != gridCoverHeight) {
@@ -239,8 +246,9 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
   const int rowHeight = SETTINGS.libraryListExpanded ? 84 : 62;
   if (!list) {
     for (int line = 0; line < geometry.rows; ++line) {
-      const int floor = area.y + (line + 1) * geometry.cellHeight + line * GAP - LABEL_HEIGHT - 30;
+      const int floor = area.y + (line + 1) * geometry.cellHeight + line * GAP - labelHeight - plankSpace;
       library_shelf::drawPlank(renderer, SETTINGS.libraryBookshelfTheme, area.x + 4, floor, area.width - 8, false);
+      library_shelf::drawPlank(renderer, SETTINGS.libraryBookshelfTheme, area.x + 4, floor, area.width - 8, true);
     }
   }
   for (int row = gridPageStart; row < pageEnd && visibleBookCount < library_shelf::MAX_VISIBLE_BOOKS; ++row) {
@@ -251,7 +259,7 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
     const int slot = visibleBookCount++;
     const int floor =
         list ? area.y + slot * rowHeight + 49
-             : area.y + (placement.line + 1) * geometry.cellHeight + placement.line * GAP - LABEL_HEIGHT - 30;
+             : area.y + (placement.line + 1) * geometry.cellHeight + placement.line * GAP - labelHeight - plankSpace;
     const int x =
         list ? area.x + 8 : area.x + placement.x + (placement.width - (spine ? placement.width : coverWidth)) / 2;
     const int y = floor - coverHeight;
@@ -309,13 +317,15 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
       renderer.drawLine(area.x, area.y + (slot + 1) * rowHeight - 1, area.right(), area.y + (slot + 1) * rowHeight - 1);
     } else if (!spine) {
       const int labelX = area.x + placement.x;
-      renderer.fillRect(labelX, floor + 30, placement.width, LABEL_HEIGHT, false);
-      drawBookLabel(rowScratch.title.c_str(), SMALL_FONT_ID, labelX + 2, floor + 31, placement.width - 4, true);
-      if (SETTINGS.libraryShowSeries && sort != Sort::RecentlyRead && index.isOpen()) {
+      renderer.fillRect(labelX, floor + plankSpace, placement.width, labelHeight, false);
+      drawBookLabel(rowScratch.title.c_str(), SMALL_FONT_ID, labelX + 2, floor + plankSpace + 1, placement.width - 4,
+                    true);
+      if (labelHeight > 24 && SETTINGS.libraryShowSeries && sort != Sort::RecentlyRead && index.isOpen()) {
         library::ClixRecord record{};
         if (index.readRecord(ordinalForRow(row), record) && index.readSeries(record, seriesScratch) &&
             !seriesScratch.empty())
-          drawBookLabel(seriesScratch.c_str(), SMALL_FONT_ID, labelX + 2, floor + 51, placement.width - 4, true);
+          drawBookLabel(seriesScratch.c_str(), SMALL_FONT_ID, labelX + 2, floor + plankSpace + 21, placement.width - 4,
+                        true);
       }
       if (SETTINGS.libraryStatusBadges) {
         const int badgeWidth = std::min(width - 4, 62);
@@ -335,12 +345,12 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
         list ? fui::Rect{area.x, static_cast<int16_t>(area.y + slot * rowHeight), area.width,
                          static_cast<int16_t>(rowHeight)}
              : fui::Rect{static_cast<int16_t>(x - 3), static_cast<int16_t>(y - 3), static_cast<int16_t>(width + 6),
-                         static_cast<int16_t>(coverHeight + LABEL_HEIGHT + 33)};
+                         static_cast<int16_t>(coverHeight + labelHeight + plankSpace + 3)};
     screen.frame().hit(hit, ACTION_ROW, static_cast<int16_t>(row), fui::InputTouch | fui::InputLongPress);
   }
   if (!list) {
     for (int line = 0; line < geometry.rows; ++line) {
-      const int floor = area.y + (line + 1) * geometry.cellHeight + line * GAP - LABEL_HEIGHT - 30;
+      const int floor = area.y + (line + 1) * geometry.cellHeight + line * GAP - labelHeight - plankSpace;
       int used = 0;
       for (int i = 0; i < visibleBookCount; ++i)
         if (bookCells[i].line == line) used = std::max<int>(used, bookCells[i].x + bookCells[i].width - area.x + GAP);
@@ -356,7 +366,6 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
                                       first.width, std::min(32, first.y - area.y - 2));
         }
       }
-      library_shelf::drawPlank(renderer, SETTINGS.libraryBookshelfTheme, area.x + 4, floor, area.width - 8, true);
     }
   }
   drawBookPager(screen, pageIndicator, bookPageIndex, bookPageCount);

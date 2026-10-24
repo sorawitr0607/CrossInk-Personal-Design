@@ -3,17 +3,22 @@
 #include <ArduinoJson.h>
 #include <Epub.h>
 #include <HalStorage.h>
+#include <Memory.h>
 
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 
 #include "LibraryActivity.h"
+#include "LibrarySettingsActivity.h"
 #include "activities/reader/BookReadingStats.h"
 
 void LibraryActivity::runSimulatorLibraryReview() {
   const char* output = std::getenv("CROSSINK_LIBRARY_REVIEW");
   if (!output) return;
+  // Hold the mutex for this synchronous, simulator-only run. Background render
+  // notifications may queue, but cannot race fixture changes or captures.
+  RenderLock reviewLock;
   unsigned checks = 0, captures = 0;
   const auto check = [&](const bool passed, const char* reason) {
     ++checks;
@@ -39,14 +44,10 @@ void LibraryActivity::runSimulatorLibraryReview() {
     check(stats.save(cache), "Cannot save fixture finished state");
   }
   invalidateCompletion();
-  const auto paint = [&] {
-    RenderLock lock;
-    render(std::move(lock));
-  };
+  const auto paint = [&] { render(std::move(reviewLock)); };
   const auto settle = [&] {
     paint();
     for (int i = 0; i < 72; ++i) {
-      RenderLock lock;
       if (collectionsVisible)
         loadCollectionPageCovers();
       else
@@ -54,9 +55,7 @@ void LibraryActivity::runSimulatorLibraryReview() {
     }
     paint();
   };
-  const auto capture = [&](const char* name) {
-    settle();
-    RenderLock lock;
+  const auto saveImage = [&](const char* name) {
     const auto path = std::filesystem::path(output) / (std::string(name) + ".pgm");
     FILE* image = std::fopen(path.c_str(), "wb");
     check(image != nullptr, "Cannot create capture");
@@ -65,6 +64,10 @@ void LibraryActivity::runSimulatorLibraryReview() {
       for (int x = 0; x < renderer.getScreenWidth(); ++x) std::fputc(renderer.isPixelBlack(x, y) ? 0 : 255, image);
     std::fclose(image);
     ++captures;
+  };
+  const auto capture = [&](const char* name) {
+    settle();
+    saveImage(name);
   };
   char name[80];
   for (uint8_t theme = 0; theme < library_shelf::ThemeCount; ++theme) {
@@ -85,6 +88,18 @@ void LibraryActivity::runSimulatorLibraryReview() {
       snprintf(name, sizeof(name), "theme-%u-view-%u", theme, view);
       capture(name);
       check(visibleBookCount > 0 && visibleBookCount <= library_shelf::MAX_VISIBLE_BOOKS, "Visible hit budget");
+      if (theme == 0 && view == library_shelf::Shelf) {
+        selection = 0;
+        showSelection = false;
+        const auto cell = bookCells[0];
+        const auto x = static_cast<int16_t>(cell.x + cell.width / 2);
+        const auto y = static_cast<int16_t>(cell.y + cell.height / 2);
+        handleInput({LibraryInputBuffer::Type::TouchPress, x, y});
+        handleInput({LibraryInputBuffer::Type::TouchRelease, x, y});
+        check(showSelection && selection == cell.row + CONTROL_COUNT && index.isOpen(),
+              "First touch selects the book without opening it");
+        capture("book-selected");
+      }
       check(bookPageCount > 1, "Fixture exercises multiple book pages");
       moveBookPage(2);
       paint();
@@ -136,6 +151,25 @@ void LibraryActivity::runSimulatorLibraryReview() {
     snprintf(name, sizeof(name), "background-%u", mode);
     capture(name);
   }
+  auto settings = makeUniqueNoThrow<LibrarySettingsActivity>(renderer, mappedInput);
+  check(static_cast<bool>(settings), "Cannot allocate Library settings review");
+  settings->onEnter();
+  settings->render(std::move(reviewLock));
+  saveImage("settings-display");
+  settings->simulatorShowFiles();
+  settings->render(std::move(reviewLock));
+  saveImage("settings-files");
+  settings->simulatorOpenGrid();
+  settings->render(std::move(reviewLock));
+  saveImage("settings-grid-chooser");
+  for (int i = 0; i < library_shelf::GRID_PRESET_COUNT; ++i) {
+    settings->simulatorApplyGrid(i);
+    const auto preset = library_shelf::GRID_PRESETS[i];
+    check(SETTINGS.libraryGridColumns == preset.columns && SETTINGS.libraryGridRows == preset.rows,
+          "Visual grid chooser persists columns and rows");
+  }
+  settings->onExit();
+  settings.reset();
   JsonDocument saved;
   SETTINGS.toJson(saved);
   SETTINGS.libraryBookView = library_shelf::List;
