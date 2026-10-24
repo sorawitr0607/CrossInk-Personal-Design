@@ -94,8 +94,6 @@ class LibraryActivity final : public Activity {
   BookCell bookCells[library_shelf::MAX_VISIBLE_BOOKS]{};
   int8_t pageProgress[library_shelf::MAX_VISIBLE_BOOKS]{};
   uint8_t visibleBookCount = 0;
-  uint8_t nextProgressSlot = 0;
-  bool pageProgressChanged = false;
   // Reused across scans/draws; never retain a title or thumbnail for every book.
   std::string collectionKey;
   std::string collectionTitle;

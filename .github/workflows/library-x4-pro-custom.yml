@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
     env:
       CROSSINK_LIBRARY_BASE: 9914146eeae7b46b300f475a16c32426fc02ec1f

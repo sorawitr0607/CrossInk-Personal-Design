@@ -34,9 +34,11 @@ activity have no intentional behavior changes.
 The collection cache holds compact book references using the existing
 PSRAM-aware allocator. Thumbnail work is limited to the visible page, processes
 one thumbnail between input checks, reuses exact-size disk caches, and requests
-one repaint after a batch. There is no animation or periodic refresh. Showing
-an unopened book's cover does not add it to Recently Opened. These are design
-constraints, not measured battery-life results. Five themes use 179,938 bytes
+one repaint after a cold cover batch. Cached percentages are read with the
+visible rows, so warm cover caches do not queue an extra repaint. There is no
+animation or periodic refresh. Browsing an unopened cover does not add a recent
+history entry. Battery life still needs measurement on a physical reader.
+Five themes use 179,938 bytes
 of packed flash masks with no SVG parser, runtime resize, animation or extra
 framebuffer. Library text uses three small one-bit bitmap font sizes in flash,
 registered only for the Library visit. It does not activate a scalable font
@@ -48,7 +50,8 @@ PSRAM is preferred and allocation failure falls back to fixed cover pages.
 
 ## Build and cloud download
 
-The `Custom Library for X4 Pro` GitHub Actions workflow runs on the
+The `Custom Library for X4 Pro` GitHub Actions workflow uses Ubuntu 24.04 and
+Python 3.12. It runs on the
 `feat/library-collections-x4-pro` branch or by manual dispatch. It checks the
 base and SDK, applies clang-format 21 to changed C++ files, runs native tests and
 cppcheck, checks the shared code with a C3 build, then builds `x4-pro` and the

@@ -74,7 +74,6 @@ bool LibraryActivity::completedRow(const int row) {
 void LibraryActivity::invalidateBookPages() {
   pageCacheValid = false;
   visibleBookCount = 0;
-  nextProgressSlot = 0;
   loadedGridPageStart = -1;
   nextGridCoverRow = -1;
   gridCoversChanged = false;
@@ -250,8 +249,6 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
   const bool newPage = loadedGridPageStart != gridPageStart && nextGridCoverRow < 0;
   if (newPage) {
     std::fill_n(pageProgress, library_shelf::MAX_VISIBLE_BOOKS, static_cast<int8_t>(-1));
-    nextProgressSlot = 0;
-    pageProgressChanged = false;
   }
   const char* captionText = mappedInput.hasTouchHardware()           ? tr(STR_LIBRARY_TAP_HINT)
                             : collectionScope == CollectionKind::All ? tr(STR_LIBRARY_ALL_BOOKS)
@@ -307,6 +304,14 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
                        spine,
                        done};
     if (!readBook(row, rowScratch)) continue;
+    if (newPage && SETTINGS.libraryStatusBadges && !done) {
+      // Seven-byte EPUB progress caches can be read with the visible row.
+      // Warm pages then need one refresh; only cold covers schedule a second.
+      const float percent = FsHelpers::hasEpubExtension(rowScratch.path)
+                                ? RecentBookProgress::loadCachedEpubPercent(rowScratch)
+                                : RecentBookProgress::loadPercent(rowScratch);
+      pageProgress[slot] = percent < 0 ? -1 : static_cast<int8_t>(std::clamp(static_cast<int>(percent + 0.5f), 0, 100));
+    }
     if (list) renderer.fillRect(area.x, area.y + slot * rowHeight, area.width, rowHeight - 1, false);
     if (spine) {
       renderer.fillRect(x, y, width, coverHeight, false);
@@ -424,30 +429,10 @@ void LibraryActivity::loadGridPageCovers() {
     if (nextGridCoverRow == visibleBookCount) {
       loadedGridPageStart = gridPageStart;
       nextGridCoverRow = -1;
-      if (gridCoversChanged) {
-        if (SETTINGS.libraryStatusBadges)
-          pageProgressChanged = true;
-        else
-          requestUpdate();
-      }
+      if (gridCoversChanged) requestUpdate();
       gridCoversChanged = false;
     }
     return;
-  }
-  if (SETTINGS.libraryStatusBadges && nextProgressSlot < visibleBookCount) {
-    const int slot = nextProgressSlot++;
-    if (!bookCells[slot].completed && readBook(bookCells[slot].row, rowScratch)) {
-      // EPUB progress is cache-only: do not parse unopened books for a badge.
-      const float percent = FsHelpers::hasEpubExtension(rowScratch.path)
-                                ? RecentBookProgress::loadCachedEpubPercent(rowScratch)
-                                : RecentBookProgress::loadPercent(rowScratch);
-      pageProgress[slot] = percent < 0 ? -1 : static_cast<int8_t>(std::clamp(static_cast<int>(percent + 0.5f), 0, 100));
-      pageProgressChanged = pageProgressChanged || percent >= 0;
-    }
-    if (nextProgressSlot == visibleBookCount && pageProgressChanged) {
-      pageProgressChanged = false;
-      requestUpdate();
-    }
   }
 }
 

@@ -9,7 +9,7 @@
 namespace library_shelf {
 const ThemeArt& art(const uint8_t theme) { return assets::THEMES[theme < 5 ? theme : 0]; }
 
-void drawSprite(GfxRenderer& renderer, const Sprite& sprite, const int x, const int y, const int sourceX,
+void drawSprite(const GfxRenderer& renderer, const Sprite& sprite, const int x, const int y, const int sourceX,
                 const int width) {
   const int cropped = width > 0 ? std::min(width, sprite.width - sourceX) : sprite.width;
   if (sourceX < 0 || cropped <= 0) return;
@@ -18,8 +18,8 @@ void drawSprite(GfxRenderer& renderer, const Sprite& sprite, const int x, const 
   if (sprite.black) renderer.drawIcon(sprite.black + offset, x, y, cropped, sprite.height);
 }
 
-void drawWall(GfxRenderer& renderer, const uint8_t theme, const uint8_t mode, const int x, const int y, const int width,
-              const int height) {
+void drawWall(const GfxRenderer& renderer, const uint8_t theme, const uint8_t mode, const int x, const int y,
+              const int width, const int height) {
   if (mode == 0) return;
   const auto& tile = *(mode == 1 ? art(theme).quiet : art(theme).wall);
   // The renderer clips to screen; the pager and footer clear their own bands
@@ -29,7 +29,7 @@ void drawWall(GfxRenderer& renderer, const uint8_t theme, const uint8_t mode, co
       drawSprite(renderer, tile, px, py, 0, std::min<int>(tile.width, x + width - px));
 }
 
-void drawPlank(GfxRenderer& renderer, const uint8_t theme, const int x, const int y, const int width,
+void drawPlank(const GfxRenderer& renderer, const uint8_t theme, const int x, const int y, const int width,
                const bool front) {
   const auto& themeArt = art(theme);
   const auto& left = *(front ? themeArt.frontLeft : themeArt.backLeft);
@@ -41,8 +41,8 @@ void drawPlank(GfxRenderer& renderer, const uint8_t theme, const int x, const in
   drawSprite(renderer, right, x + width - 12, y - 25);
 }
 
-void drawOrnament(GfxRenderer& renderer, const uint8_t theme, const uint8_t placement, const unsigned seed, const int x,
-                  const int floorY, const int maxWidth, const int maxHeight) {
+void drawOrnament(const GfxRenderer& renderer, const uint8_t theme, const uint8_t placement, const unsigned seed,
+                  const int x, const int floorY, const int maxWidth, const int maxHeight) {
   const auto& themeArt = art(theme);
   for (unsigned i = 0; i < themeArt.pieceCount; ++i) {
     const auto& piece = *themeArt.pieces[(seed * 2 + i) % themeArt.pieceCount];
