@@ -10,6 +10,7 @@
 #include <filesystem>
 
 #include "LibraryActivity.h"
+#include "LibraryFonts.h"
 #include "LibrarySettingsActivity.h"
 #include "activities/reader/BookReadingStats.h"
 
@@ -25,10 +26,13 @@ void LibraryActivity::runSimulatorLibraryReview() {
     if (passed) return;
     std::fprintf(stderr, "LIBRARY REVIEW FAIL: %s\n", reason);
     std::fflush(stderr);
-    std::exit(2);
+    std::_Exit(2);
   };
   std::filesystem::create_directories(output);
   const auto recentCountBefore = RECENT_BOOKS.getCount();
+  check(renderer.getTextWidth(library_shelf::FONT_BODY, "All Books") > 0 &&
+            renderer.getTextWidth(library_shelf::FONT_HEADING, "Your little library") > 0,
+        "Library serif bitmap fonts registered");
   check(index.bookCount() >= 20, "Missing generated LibraryReview fixtures");
   // These are generated books in a temporary simulator card, never the user's
   // SD card. Refuse the review before writing a single fixture statistic.
@@ -82,6 +86,8 @@ void LibraryActivity::runSimulatorLibraryReview() {
     snprintf(name, sizeof(name), "theme-%u-collections", theme);
     capture(name);
     for (uint8_t view = 0; view < library_shelf::ViewCount; ++view) {
+      SETTINGS.libraryGridColumns = 3;
+      SETTINGS.libraryGridRows = 2;
       SETTINGS.libraryBookView = view;
       enterCollection(-1);
       check(sort == Sort::Series && !descending, "Collections start with Series ascending");
@@ -196,6 +202,6 @@ void LibraryActivity::runSimulatorLibraryReview() {
   check(RECENT_BOOKS.getCount() == recentCountBefore, "Unopened covers never enter recent history");
   std::printf("LIBRARY REVIEW PASS: %u checks, %u native captures\n", checks, captures);
   std::fflush(stdout);
-  std::exit(0);
+  std::_Exit(0);
 }
 #endif

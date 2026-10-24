@@ -20,6 +20,7 @@
 #include <cstdlib>
 #include <functional>
 
+#include "LibraryFonts.h"
 #include "activities/home/BookActions.h"
 #include "activities/home/FileBrowserActionActivity.h"
 #include "activities/home/RecentBookProgress.h"
@@ -95,6 +96,7 @@ void LibraryActivity::onEnter() {
     app.setDevice(uiTarget.deviceContext());
     if (RECENT_BOOKS.pruneMissing()) RECENT_BOOKS.saveToFile();
     applySharedUiTheme(app, uiTarget);
+    library_shelf::registerFonts(renderer);
     seriesScratch.reserve(128);
     genreScratch.reserve(128);
     subtitleScratch.reserve(448);
@@ -149,6 +151,7 @@ void LibraryActivity::onExit() {
   rowCompletion.reset();
   bookPages.reset();
   collectionCapacity = 0;
+  library_shelf::unregisterFonts(renderer);
   Activity::onExit();
 }
 
@@ -1183,7 +1186,7 @@ void LibraryActivity::buildSortHeader(UiApp::ScreenType& screen) {
                          band.height};
   char label[128];
   snprintf(label, sizeof(label), "%s: %s", tr(STR_LIBRARY_SORT_BY), sortLabel());
-  drawBookLabel(label, SMALL_FONT_ID, method.x, method.y + 11, method.width - 12);
+  drawBookLabel(label, library_shelf::FONT_BODY, method.x, method.y + 11, method.width - 12);
   const int cy = band.y + band.height / 2, dx = direction.x + 22;
   renderer.drawLine(dx, cy - 8, dx, cy + 8);
   const int tip = descending ? cy + 8 : cy - 8, base = descending ? tip - 5 : tip + 5;
@@ -1430,9 +1433,9 @@ void LibraryActivity::render(RenderLock&&) {
       mappedInput.hasTouchHardware() ? 0 : UITheme::getInstance().getMetrics().buttonHintsHeight;
   renderer.fillRect(0, renderer.getScreenHeight() - bounds[2] - buttonHintsHeight - FOOTER_HEIGHT,
                     renderer.getScreenWidth(), FOOTER_HEIGHT, false);
-  renderer.drawCenteredText(SMALL_FONT_ID,
+  renderer.drawCenteredText(library_shelf::FONT_SMALL,
                             renderer.getScreenHeight() - bounds[2] - buttonHintsHeight -
-                                (FOOTER_HEIGHT + renderer.getLineHeight(SMALL_FONT_ID)) / 2,
+                                (FOOTER_HEIGHT + renderer.getLineHeight(library_shelf::FONT_SMALL)) / 2,
                             footer);
   if (pendingCacheDeletedFeedback) GUI.drawPopup(renderer, tr(STR_BOOK_CACHE_DELETED));
   renderer.displayBuffer();

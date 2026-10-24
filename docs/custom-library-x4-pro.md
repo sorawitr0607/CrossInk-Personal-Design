@@ -36,9 +36,11 @@ PSRAM-aware allocator. Thumbnail work is limited to the visible page, processes
 one thumbnail between input checks, reuses exact-size disk caches, and requests
 one repaint after a batch. There is no animation or periodic refresh. Showing
 an unopened book's cover does not add it to Recently Opened. These are design
-constraints, not measured battery-life results. Five themes use 175,198 bytes
+constraints, not measured battery-life results. Five themes use 181,378 bytes
 of packed flash masks with no SVG parser, runtime resize, animation or extra
-framebuffer. Exact finished counts read cached statistics once per book per
+framebuffer. Library text uses three small one-bit bitmap font sizes in flash,
+registered only for the Library visit. It does not activate a scalable font
+workspace. Exact finished counts read cached statistics once per book per
 Library visit, then reuse two completion bits per indexed book. Refresh and
 book actions invalidate that cache. At the 32,767-book index limit, status and
 page arrays need at most about 28 KiB in addition to collection references;

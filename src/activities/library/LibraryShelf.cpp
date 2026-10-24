@@ -11,6 +11,7 @@
 #include <functional>
 
 #include "LibraryActivity.h"
+#include "LibraryFonts.h"
 #include "LibraryShelfArt.h"
 #include "activities/home/BookActions.h"
 #include "activities/home/RecentBookProgress.h"
@@ -210,7 +211,7 @@ void LibraryActivity::drawBookPager(UiApp::ScreenType& screen, const fui::Rect& 
   char label[32];
   snprintf(label, sizeof(label), tr(STR_LIBRARY_PAGE_COUNT), static_cast<unsigned>(current + 1),
            static_cast<unsigned>(total));
-  drawBookLabel(label, SMALL_FONT_ID, area.x + 88, area.y + 12, area.width - 176, true);
+  drawBookLabel(label, library_shelf::FONT_SMALL, area.x + 88, area.y + 12, area.width - 176, true);
   const int xs[] = {area.x, area.x + 44, area.right() - 88, area.right() - 44};
   const int values[] = {PAGE_FIRST, PAGE_PREVIOUS, PAGE_NEXT, PAGE_LAST};
   for (int i = 0; i < 4; ++i) {
@@ -254,7 +255,7 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
   const char* captionText = mappedInput.hasTouchHardware()           ? tr(STR_LIBRARY_TAP_HINT)
                             : collectionScope == CollectionKind::All ? tr(STR_LIBRARY_ALL_BOOKS)
                                                                      : collectionTitle.c_str();
-  drawBookLabel(captionText, SMALL_FONT_ID, caption.x + 12, caption.y + 2, caption.width - 24);
+  drawBookLabel(captionText, library_shelf::FONT_SMALL, caption.x + 12, caption.y + 2, caption.width - 24);
   library_shelf::drawWall(renderer, SETTINGS.libraryBookshelfTheme, SETTINGS.libraryBackground, area.x, area.y,
                           area.width, area.height);
   const bool dense = library_shelf::rows(SETTINGS.libraryGridRows) >= 3;
@@ -315,29 +316,33 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
       // Rotate a bounded title into the actual spine height; never infer page counts.
       subtitleScratch.assign(rowScratch.title);
       while (!subtitleScratch.empty() &&
-             renderer.getTextWidth(SMALL_FONT_ID, subtitleScratch.c_str()) > coverHeight - 24) {
+             renderer.getTextWidth(library_shelf::FONT_SMALL, subtitleScratch.c_str()) > coverHeight - 24) {
         size_t last = subtitleScratch.size() - 1;
         while (last > 0 && (static_cast<unsigned char>(subtitleScratch[last]) & 0xc0) == 0x80) --last;
         subtitleScratch.resize(last);
       }
-      const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, subtitleScratch.c_str());
-      renderer.drawTextRotated90CW(SMALL_FONT_ID, x + (width - renderer.getLineHeight(SMALL_FONT_ID)) / 2,
+      const int textWidth = renderer.getTextWidth(library_shelf::FONT_SMALL, subtitleScratch.c_str());
+      renderer.drawTextRotated90CW(library_shelf::FONT_SMALL,
+                                   x + (width - renderer.getLineHeight(library_shelf::FONT_SMALL)) / 2,
                                    y + (coverHeight + textWidth) / 2, subtitleScratch.c_str(), true);
     } else {
       renderer.fillRect(x, y, width, coverHeight, false);
       if (!drawCachedCover(rowScratch, x, y, width, coverHeight)) {
         renderer.drawRect(x, y, width, coverHeight);
         renderer.drawLine(x + 4, y + 4, x + 4, floor - 4);
-        if (!list) drawBookLabel(rowScratch.title.c_str(), SMALL_FONT_ID, x + 8, y + coverHeight / 3, width - 16, true);
+        if (!list)
+          drawBookLabel(rowScratch.title.c_str(), library_shelf::FONT_SMALL, x + 8, y + coverHeight / 3, width - 16,
+                        true);
       }
       renderer.drawRect(x, y, width, coverHeight);
     }
     if (list) {
-      drawBookLabel(rowScratch.title.c_str(), BITTER_10_FONT_ID, x + width + 12, y, area.width - width - 28);
+      drawBookLabel(rowScratch.title.c_str(), library_shelf::FONT_BODY, x + width + 12, y, area.width - width - 28);
       if (SETTINGS.libraryListExpanded)
-        drawBookLabel(rowScratch.author.c_str(), SMALL_FONT_ID, x + width + 12, y + 23, area.width - width - 28);
+        drawBookLabel(rowScratch.author.c_str(), library_shelf::FONT_SMALL, x + width + 12, y + 23,
+                      area.width - width - 28);
       formatBookMetadata(row, !SETTINGS.libraryListExpanded);
-      drawBookLabel(collectionScratch.c_str(), SMALL_FONT_ID, x + width + 12,
+      drawBookLabel(collectionScratch.c_str(), library_shelf::FONT_SMALL, x + width + 12,
                     y + (SETTINGS.libraryListExpanded ? 45 : 23), area.width - width - 136);
       const int statusY = area.y + slot * rowHeight + rowHeight - 24;
       if (SETTINGS.libraryStatusBadges) {
@@ -347,17 +352,17 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
         drawBookLabel(done            ? tr(STR_LIBRARY_STATUS_FINISHED)
                       : progress >= 0 ? percent
                                       : tr(STR_LIBRARY_STATUS_NEW),
-                      SMALL_FONT_ID, area.right() - 100, statusY, 92);
+                      library_shelf::FONT_SMALL, area.right() - 100, statusY, 92);
       }
       renderer.drawLine(area.x, area.y + (slot + 1) * rowHeight - 1, area.right(), area.y + (slot + 1) * rowHeight - 1);
     } else if (!spine) {
       const int labelX = area.x + placement.x;
       renderer.fillRect(labelX, floor + plankSpace, placement.width, labelHeight, false);
-      drawBookLabel(rowScratch.title.c_str(), SMALL_FONT_ID, labelX + 2, floor + plankSpace + 1, placement.width - 4,
-                    true);
+      drawBookLabel(rowScratch.title.c_str(), library_shelf::FONT_SMALL, labelX + 2, floor + plankSpace + 1,
+                    placement.width - 4, true);
       if (labelHeight > 24) {
         formatBookMetadata(row, false);
-        drawBookLabel(collectionScratch.c_str(), SMALL_FONT_ID, labelX + 2, floor + plankSpace + 21,
+        drawBookLabel(collectionScratch.c_str(), library_shelf::FONT_SMALL, labelX + 2, floor + plankSpace + 21,
                       placement.width - 4, true);
       }
       if (SETTINGS.libraryStatusBadges) {
@@ -370,7 +375,7 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
                                              : tr(STR_LIBRARY_STATUS_NEW);
         renderer.fillRect(x + width - badgeWidth - 2, y + 3, badgeWidth, 21, false);
         renderer.drawRect(x + width - badgeWidth - 2, y + 3, badgeWidth, 21);
-        drawBookLabel(status, SMALL_FONT_ID, x + width - badgeWidth, y + 2, badgeWidth - 4, true);
+        drawBookLabel(status, library_shelf::FONT_SMALL, x + width - badgeWidth, y + 2, badgeWidth - 4, true);
       }
     }
     if (showSelection && row == selectedRow) renderer.drawRect(x - 3, y - 3, width + 6, coverHeight + 6, 2, true);
@@ -394,9 +399,13 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
           library_shelf::drawOrnament(renderer, SETTINGS.libraryBookshelfTheme, 1, line, area.x + 10, floor - 24,
                                       std::min<int>(120, area.width / 3), geometry.coverHeight - 24);
         if (visibleBookCount > 0 && line == 0) {
-          const auto& first = bookCells[0];
-          library_shelf::drawOrnament(renderer, SETTINGS.libraryBookshelfTheme, 3, bookPageIndex, first.x, first.y - 1,
-                                      first.width, std::min(32, first.y - area.y - 2));
+          for (int i = 0; i < visibleBookCount; ++i) {
+            const auto& first = bookCells[i];
+            if (first.line != 0 || first.spine) continue;
+            library_shelf::drawOrnament(renderer, SETTINGS.libraryBookshelfTheme, 3, bookPageIndex, first.x,
+                                        first.y - 1, first.width, std::min(32, first.y - area.y - 2));
+            break;
+          }
         }
       }
     }

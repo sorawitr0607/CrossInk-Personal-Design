@@ -9,6 +9,7 @@
 #include <cstdio>
 
 #include "LibraryActivity.h"
+#include "LibraryFonts.h"
 #include "LibraryShelfArt.h"
 #include "components/UITheme.h"
 #include "fontIds.h"
@@ -326,11 +327,11 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
   const uint8_t theme = SETTINGS.libraryBookshelfTheme < library_shelf::ThemeCount ? SETTINGS.libraryBookshelfTheme : 0;
   const auto& art = library_shelf::art(theme);
   const int heroWidth = SETTINGS.libraryOrnaments ? art.hero->width + 16 : 0;
-  drawBookLabel(I18N.get(themeLabels[theme]), SMALL_FONT_ID, heroBand.x + 16, heroBand.y + 3,
+  drawBookLabel(I18N.get(themeLabels[theme]), library_shelf::FONT_SMALL, heroBand.x + 16, heroBand.y + 3,
                 heroBand.width - heroWidth - 28);
-  drawBookLabel(I18N.get(headlines[theme]), BITTER_12_FONT_ID, heroBand.x + 16, heroBand.y + 24,
+  drawBookLabel(I18N.get(headlines[theme]), library_shelf::FONT_HEADING, heroBand.x + 16, heroBand.y + 24,
                 heroBand.width - heroWidth - 28);
-  drawBookLabel(I18N.get(taglines[theme]), SMALL_FONT_ID, heroBand.x + 16, heroBand.y + 56,
+  drawBookLabel(I18N.get(taglines[theme]), library_shelf::FONT_SMALL, heroBand.x + 16, heroBand.y + 56,
                 heroBand.width - heroWidth - 28);
   if (SETTINGS.libraryOrnaments)
     library_shelf::drawSprite(renderer, *art.hero, heroBand.right() - art.hero->width - 12,
@@ -345,8 +346,8 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
     renderer.fillRect(tab.x, tab.y, tab.width, tab.height, active);
     renderer.drawRect(tab.x, tab.y, tab.width, tab.height);
     const char* label = I18N.get(tabLabels[i]);
-    const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, label);
-    renderer.drawText(SMALL_FONT_ID, tab.x + (tab.width - textWidth) / 2, tab.y + 10, label, !active);
+    const int textWidth = renderer.getTextWidth(library_shelf::FONT_SMALL, label);
+    renderer.drawText(library_shelf::FONT_SMALL, tab.x + (tab.width - textWidth) / 2, tab.y + 10, label, !active);
     screen.frame().hit(tab, ACTION_COLLECTION, static_cast<int16_t>(TAB_SERIES + i), fui::InputTouch);
   }
   const auto background = screen.body();
@@ -364,13 +365,13 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
     if (!drawCachedCover(rowScratch, x, y, ALL_COVER_WIDTH, ALL_COVER_HEIGHT))
       renderer.drawRect(x, y, ALL_COVER_WIDTH, ALL_COVER_HEIGHT);
   }
-  drawBookLabel(tr(STR_LIBRARY_ALL_BOOKS), BITTER_10_FONT_ID, all.x + 82, all.y + 5, all.width - 110);
+  drawBookLabel(tr(STR_LIBRARY_ALL_BOOKS), library_shelf::FONT_BODY, all.x + 82, all.y + 5, all.width - 110);
   char counts[64], finished[28];
   snprintf(counts, sizeof(counts), tr(STR_LIBRARY_BOOKS_COUNT), static_cast<unsigned>(rowCount()));
   snprintf(finished, sizeof(finished), tr(STR_LIBRARY_FINISHED_COUNT), static_cast<unsigned>(allCompleted));
   collectionScratch.assign(counts);
   collectionScratch.append(" ? ").append(finished);
-  drawBookLabel(collectionScratch.c_str(), SMALL_FONT_ID, all.x + 82, all.y + 31, all.width - 110);
+  drawBookLabel(collectionScratch.c_str(), library_shelf::FONT_SMALL, all.x + 82, all.y + 31, all.width - 110);
   renderer.drawLine(all.right() - 21, all.y + 23, all.right() - 15, all.y + 29);
   renderer.drawLine(all.right() - 15, all.y + 29, all.right() - 21, all.y + 35);
   if (showSelection && collectionSelection == 0) renderer.drawRect(all.x + 4, all.y + 4, all.width - 8, all.height - 8);
@@ -417,7 +418,8 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
       if (!drawCachedCover(rowScratch, x, y, coverWidth, coverHeight)) {
         renderer.drawRect(x, y, coverWidth, coverHeight);
         if (i == 0)
-          drawBookLabel(rowScratch.title.c_str(), SMALL_FONT_ID, x + 8, y + coverHeight / 3, coverWidth - 16, true);
+          drawBookLabel(rowScratch.title.c_str(), library_shelf::FONT_SMALL, x + 8, y + coverHeight / 3,
+                        coverWidth - 16, true);
       }
       renderer.drawRect(x, y, coverWidth, coverHeight);
     }
@@ -428,12 +430,14 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
     const int plateX = cx + (cellWidth - art.plate->width) / 2;
     library_shelf::drawSprite(renderer, *art.plate, plateX, floor + 29);
     if (collectionLabel(group, collectionScratch))
-      drawBookLabel(collectionScratch.c_str(), BITTER_10_FONT_ID, plateX + 10, floor + 32, art.plate->width - 20, true);
+      drawBookLabel(collectionScratch.c_str(), library_shelf::FONT_BODY, plateX + 10, floor + 32, art.plate->width - 20,
+                    true);
     snprintf(counts, sizeof(counts), tr(STR_LIBRARY_BOOKS_COUNT), static_cast<unsigned>(group.count));
     snprintf(finished, sizeof(finished), tr(STR_LIBRARY_FINISHED_COUNT), static_cast<unsigned>(group.completed));
     collectionScratch.assign(counts);
     if (group.completed) collectionScratch.append(" ? ").append(finished);
-    drawBookLabel(collectionScratch.c_str(), SMALL_FONT_ID, plateX + 10, floor + 57, art.plate->width - 20, true);
+    drawBookLabel(collectionScratch.c_str(), library_shelf::FONT_SMALL, plateX + 10, floor + 57, art.plate->width - 20,
+                  true);
     if (showSelection && collectionSelection == groupIndex + 1)
       renderer.drawRect(cx + 3, floor - coverHeight - 12, cellWidth - 6, coverHeight + 92);
     screen.frame().hit(fui::Rect{static_cast<int16_t>(cx), static_cast<int16_t>(area.y + line * cellHeight),
@@ -441,8 +445,8 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
                        ACTION_COLLECTION, static_cast<int16_t>(visible + 1), fui::InputTouch);
   }
   if (collectionCount == 0)
-    drawBookLabel(collectionsFailed ? tr(STR_LIBRARY_SEARCH_FAILED) : tr(STR_LIBRARY_EMPTY), SMALL_FONT_ID, area.x + 10,
-                  area.y + 4, area.width - 20, true);
+    drawBookLabel(collectionsFailed ? tr(STR_LIBRARY_SEARCH_FAILED) : tr(STR_LIBRARY_EMPTY), library_shelf::FONT_SMALL,
+                  area.x + 10, area.y + 4, area.width - 20, true);
 }
 
 void LibraryActivity::loadCollectionPageCovers() {

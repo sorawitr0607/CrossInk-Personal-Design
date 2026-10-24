@@ -10,6 +10,7 @@ import io
 import json
 from pathlib import Path
 import subprocess
+import sys
 
 from PIL import Image
 import resvg_py
@@ -22,6 +23,28 @@ except NameError:  # PlatformIO executes extra scripts without __file__.
 OUTPUT = ROOT / "src/activities/library/LibraryShelfAssets.generated.h"
 FONT = ROOT / "lib/EpdFont/scalableFonts/bitter_regular.ttf"
 BAYER = ((0, 8, 2, 10), (12, 4, 14, 6), (3, 11, 1, 9), (15, 7, 13, 5))
+
+
+def generate_fonts():
+    converter = ROOT / "lib/EpdFont/scripts/fontconvert.py"
+    italic = ROOT / "lib/EpdFont/scalableFonts/bitter_italic.ttf"
+    output = ROOT / "src/activities/library/LibraryFonts.generated.h"
+    digest = hashlib.sha256(converter.read_bytes() + FONT.read_bytes() + italic.read_bytes()
+                            + (ROOT / "scripts/build_library_assets.py").read_bytes()).hexdigest()
+    if output.exists() and digest in output.read_text(encoding="utf-8")[:160]:
+        return
+    parts = [f"// Generated Library bitmap fonts; source SHA256 {digest}\n"]
+    for name, points, source in (("small", 6, FONT), ("body", 8, FONT), ("heading", 12, italic)):
+        command = [sys.executable, str(converter), f"library_{name}", str(points), str(source),
+                   "--no-default-intervals"]
+        for interval in ("0x20,0x24f", "0x300,0x52f", "0x1ea0,0x1eff", "0x2000,0x206f", "0x20a0,0x20cf", "0xfffd,0xfffd"):
+            command += ["--additional-intervals", interval]
+        result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, encoding="utf-8")
+        if result.returncode:
+            raise RuntimeError(f"Library {name} font generation failed: {result.stderr[-1000:]}")
+        parts.append(result.stdout)
+    output.write_text("\n".join(parts), encoding="utf-8")
+    print("Library labels: three flash-only bitmap sizes; no scalable font workspace")
 
 
 def generate():
@@ -47,7 +70,10 @@ def generate():
                     continue
                 lum = (r * 299 + g * 587 + b * 114) // 1000
                 lum = 255 if lum > 235 else 0 if lum < 40 else lum
-                (white if lum > threshold else black).putpixel((x, y), 0)
+                # Allocate black, white and transparent coverage in disjoint
+                # intervals. Reusing the alpha threshold for gray intensity
+                # otherwise erases thin gray SVG strokes completely.
+                (black if threshold < a * (255 - lum) / 255 else white).putpixel((x, y), 0)
         # GfxRenderer::drawIcon consumes columns in reverse order in portrait.
         return [plane.transpose(Image.Transpose.ROTATE_90).tobytes() for plane in (white, black)]
 
@@ -113,4 +139,5 @@ def generate():
     print(f"Library artwork: {total:,} flash bytes, five themes, no runtime allocation")
 
 
+generate_fonts()
 generate()
