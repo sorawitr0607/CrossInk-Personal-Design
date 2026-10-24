@@ -189,6 +189,7 @@ class LibraryActivity final : public Activity {
   void moveBookPage(int direction);
   void drawBookPager(UiApp::ScreenType& screen, const freeink::ui::Rect& area, int current, int total);
   void drawBookLabel(const char* text, int font, int x, int y, int width, bool centered = false);
+  void formatBookMetadata(int row, bool includeAuthor);
   void buildCollectionScreen(UiApp::ScreenType& screen);
   void buildCollections();
   void enterCollections(CollectionKind tab);

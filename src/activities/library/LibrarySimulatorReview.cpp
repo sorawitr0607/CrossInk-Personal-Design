@@ -142,6 +142,22 @@ void LibraryActivity::runSimulatorLibraryReview() {
     paint();
     check(SETTINGS.libraryBookView == library_shelf::Shelf, "Sort preserves selected view");
   }
+  simulatorSetView(5, false);
+  check(readBook(0, rowScratch), "Read metadata fixture");
+  SETTINGS.libraryShowSeries = true;
+  SETTINGS.libraryShowGenre = true;
+  formatBookMetadata(0, false);
+  check(collectionScratch.find(" #1") != std::string::npos && collectionScratch.find("Fiction") != std::string::npos,
+        "Metadata shows numeric series position and genre");
+  SETTINGS.libraryShowSeries = false;
+  formatBookMetadata(0, false);
+  check(collectionScratch.find('#') == std::string::npos && collectionScratch.find("Fiction") != std::string::npos,
+        "Series display switch");
+  SETTINGS.libraryShowGenre = false;
+  formatBookMetadata(0, false);
+  check(collectionScratch.empty(), "Genre display switch");
+  SETTINGS.libraryShowSeries = true;
+  SETTINGS.libraryShowGenre = true;
   simulatorSetView(1, false, "Volume 02");
   check(rowCount() > 0 && rowCount() < index.bookCount(), "Search returns matching fixtures");
   capture("search");

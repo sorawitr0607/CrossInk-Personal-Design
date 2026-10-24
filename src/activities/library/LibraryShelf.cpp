@@ -7,6 +7,7 @@
 
 #include <algorithm>
 #include <cstdio>
+#include <cstring>
 #include <functional>
 
 #include "LibraryActivity.h"
@@ -174,6 +175,35 @@ void LibraryActivity::drawBookLabel(const char* text, const int font, const int 
   renderer.drawText(font, x + offset, y, subtitleScratch.c_str());
 }
 
+void LibraryActivity::formatBookMetadata(const int row, const bool includeAuthor) {
+  collectionScratch.clear();
+  const auto append = [this](const std::string& value) {
+    if (value.empty() || collectionScratch.size() >= 380) return;
+    if (!collectionScratch.empty()) collectionScratch.append(" · ");
+    const int bytes = utf8SafeTruncateBuffer(value.data(), std::min<int>(value.size(), 384 - collectionScratch.size()));
+    collectionScratch.append(value.data(), bytes);
+  };
+  if (includeAuthor) append(rowScratch.author);
+  if (!SETTINGS.libraryUseMetadata || sort == Sort::RecentlyRead || !index.isOpen()) return;
+  library::ClixRecord record{};
+  const auto ordinal = ordinalForRow(row);
+  if (ordinal == UINT16_MAX || !index.readRecord(ordinal, record)) return;
+  if (SETTINGS.libraryShowSeries && index.readSeries(record, seriesScratch) && !seriesScratch.empty()) {
+    append(seriesScratch);
+    uint32_t position = 0;
+    if (collectionScratch.size() < 352 && index.readSeriesPosition(record, position) &&
+        position != library::CLIX_UNKNOWN_SERIES_POSITION) {
+      const uint32_t bits = position & 0x80000000u ? position ^ 0x80000000u : ~position;
+      float number = 0;
+      memcpy(&number, &bits, sizeof(number));
+      char label[24];
+      snprintf(label, sizeof(label), " #%g", static_cast<double>(number));
+      collectionScratch.append(label);
+    }
+  }
+  if (SETTINGS.libraryShowGenre && index.readGenre(record, genreScratch)) append(genreScratch);
+}
+
 void LibraryActivity::drawBookPager(UiApp::ScreenType& screen, const fui::Rect& area, const int current,
                                     const int total) {
   renderer.fillRect(area.x, area.y, area.width, area.height, false);
@@ -304,6 +334,9 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
       drawBookLabel(rowScratch.title.c_str(), BITTER_10_FONT_ID, x + width + 12, y, area.width - width - 28);
       if (SETTINGS.libraryListExpanded)
         drawBookLabel(rowScratch.author.c_str(), SMALL_FONT_ID, x + width + 12, y + 23, area.width - width - 28);
+      formatBookMetadata(row, !SETTINGS.libraryListExpanded);
+      drawBookLabel(collectionScratch.c_str(), SMALL_FONT_ID, x + width + 12,
+                    y + (SETTINGS.libraryListExpanded ? 45 : 23), area.width - width - 136);
       const int statusY = area.y + slot * rowHeight + rowHeight - 24;
       if (SETTINGS.libraryStatusBadges) {
         char percent[16];
@@ -320,12 +353,10 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
       renderer.fillRect(labelX, floor + plankSpace, placement.width, labelHeight, false);
       drawBookLabel(rowScratch.title.c_str(), SMALL_FONT_ID, labelX + 2, floor + plankSpace + 1, placement.width - 4,
                     true);
-      if (labelHeight > 24 && SETTINGS.libraryShowSeries && sort != Sort::RecentlyRead && index.isOpen()) {
-        library::ClixRecord record{};
-        if (index.readRecord(ordinalForRow(row), record) && index.readSeries(record, seriesScratch) &&
-            !seriesScratch.empty())
-          drawBookLabel(seriesScratch.c_str(), SMALL_FONT_ID, labelX + 2, floor + plankSpace + 21, placement.width - 4,
-                        true);
+      if (labelHeight > 24) {
+        formatBookMetadata(row, false);
+        drawBookLabel(collectionScratch.c_str(), SMALL_FONT_ID, labelX + 2, floor + plankSpace + 21,
+                      placement.width - 4, true);
       }
       if (SETTINGS.libraryStatusBadges) {
         const int badgeWidth = std::min(width - 4, 62);
