@@ -251,8 +251,10 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
     nextProgressSlot = 0;
     pageProgressChanged = false;
   }
-  drawBookLabel(collectionScope == CollectionKind::All ? tr(STR_LIBRARY_ALL_BOOKS) : collectionTitle.c_str(),
-                BITTER_10_FONT_ID, caption.x + 12, caption.y + 2, caption.width - 24);
+  const char* captionText = mappedInput.hasTouchHardware()           ? tr(STR_LIBRARY_TAP_HINT)
+                            : collectionScope == CollectionKind::All ? tr(STR_LIBRARY_ALL_BOOKS)
+                                                                     : collectionTitle.c_str();
+  drawBookLabel(captionText, SMALL_FONT_ID, caption.x + 12, caption.y + 2, caption.width - 24);
   library_shelf::drawWall(renderer, SETTINGS.libraryBookshelfTheme, SETTINGS.libraryBackground, area.x, area.y,
                           area.width, area.height);
   const bool dense = library_shelf::rows(SETTINGS.libraryGridRows) >= 3;

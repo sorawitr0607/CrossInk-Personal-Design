@@ -68,8 +68,16 @@ def main():
             fixture(card / "fs_/LibraryReview" / ("Fables" if i % 2 else "Stories") / f"book-{i:02}.epub", i)
         environment = dict(os.environ, SDL_VIDEODRIVER="dummy", CROSSINK_SIMULATOR_SMOKE_TEST="1",
                            CROSSINK_LIBRARY_REVIEW=str(output))
-        result = subprocess.run([str(program)], cwd=card, env=environment, stdout=subprocess.PIPE,
-                                stderr=subprocess.STDOUT, text=True, timeout=420)
+        try:
+            result = subprocess.run([str(program)], cwd=card, env=environment, stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT, text=True, timeout=420)
+        except subprocess.TimeoutExpired as error:
+            log = error.stdout or b""
+            if isinstance(log, bytes):
+                log = log.decode("utf-8", errors="replace")
+            (output / "review.log").write_text(log, encoding="utf-8")
+            print("\n".join(log.splitlines()[-20:]))
+            raise SystemExit("Native Library review exceeded 420 seconds") from None
         (output / "review.log").write_text(result.stdout, encoding="utf-8")
         print("\n".join(result.stdout.splitlines()[-12:]))
         if result.returncode or "LIBRARY REVIEW PASS:" not in result.stdout:

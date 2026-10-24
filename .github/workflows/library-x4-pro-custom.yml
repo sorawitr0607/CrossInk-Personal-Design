@@ -63,6 +63,7 @@ jobs:
       - name: Verify native X4 Pro Library screens
         run: |
           set -euo pipefail
+          mkdir -p build artifacts/native-library-review
           sudo apt-get update
           sudo apt-get install -y libsdl2-dev
           pio run -j2 -e x4-pro-simulator | tee build/library-simulator.log
