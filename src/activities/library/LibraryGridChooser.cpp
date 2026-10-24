@@ -18,6 +18,7 @@ void LibrarySettingsActivity::applyGridPreset(const int selected) {
   }
   gridSelection = selected;
   gridChooser = false;
+  uiReady = false;
   app.clearTapFlash();
   requestUpdate();
 }

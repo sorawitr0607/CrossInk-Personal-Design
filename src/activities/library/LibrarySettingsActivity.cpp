@@ -119,6 +119,7 @@ void LibrarySettingsActivity::chooseBackground() {
 void LibrarySettingsActivity::chooseGridSize() {
   gridSelection = library_shelf::presetIndex(SETTINGS.libraryGridColumns, SETTINGS.libraryGridRows);
   gridChooser = true;
+  uiReady = false;
   requestUpdate();
 }
 

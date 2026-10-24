@@ -381,14 +381,19 @@ void LibraryActivity::loadGridPageCovers() {
     if (nextGridCoverRow == visibleBookCount) {
       loadedGridPageStart = gridPageStart;
       nextGridCoverRow = -1;
-      if (gridCoversChanged) requestUpdate();
+      if (gridCoversChanged) {
+        if (SETTINGS.libraryStatusBadges)
+          pageProgressChanged = true;
+        else
+          requestUpdate();
+      }
       gridCoversChanged = false;
     }
     return;
   }
-  if (nextProgressSlot < visibleBookCount) {
+  if (SETTINGS.libraryStatusBadges && nextProgressSlot < visibleBookCount) {
     const int slot = nextProgressSlot++;
-    if (readBook(bookCells[slot].row, rowScratch)) {
+    if (!bookCells[slot].completed && readBook(bookCells[slot].row, rowScratch)) {
       // EPUB progress is cache-only: do not parse unopened books for a badge.
       const float percent = FsHelpers::hasEpubExtension(rowScratch.path)
                                 ? RecentBookProgress::loadCachedEpubPercent(rowScratch)
