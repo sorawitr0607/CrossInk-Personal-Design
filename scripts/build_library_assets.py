@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -101,17 +102,23 @@ def generate():
         name = theme["id"].replace("-", "_")
         defs = data["defs"] + theme["defs"]
 
-        def raster(w, h, inner, maxw=None, maxh=None, viewbox=None):
+        def raster(w, h, inner, maxw=None, maxh=None, viewbox=None, ink_wall=False):
             scale = min(1, (maxw or w) / w, (maxh or h) / h)
             ow, oh = max(1, round(w * scale)), max(1, round(h * scale))
             svg = f'<svg xmlns="http://www.w3.org/2000/svg" width="{ow}" height="{oh}" viewBox="{viewbox or f"0 0 {w} {h}"}"><defs>{defs}</defs>{inner}</svg>'
+            if ink_wall:
+                # Illustrated walls need continuous ink at physical resolution;
+                # keep their fills pale and leave Quiet in its original tone.
+                svg = re.sub(r'stroke="#[0-9a-fA-F]{3,8}"', 'stroke="#161513"', svg)
+                svg = re.sub(r'stroke-width="([0-9.]+)"',
+                             lambda m: f'stroke-width="{max(1.0, float(m[1]))}"', svg)
             png = resvg_py.svg_to_bytes(svg_string=svg, skip_system_fonts=True,
                                         font_files=[str(FONT)], font_family="Bitter")
             return Image.open(io.BytesIO(png)).convert("RGBA")
 
         wall = theme["wall"]["tile"]
         quiet = theme["wall"].get("quiet", wall)
-        wall_name = sprite(name + "_wall", raster(wall["w"], wall["h"], wall["svg"], 120, 120))
+        wall_name = sprite(name + "_wall", raster(wall["w"], wall["h"], wall["svg"], 120, 120, ink_wall=True))
         quiet_name = sprite(name + "_quiet", raster(quiet["w"], quiet["h"], quiet["svg"], 120, 120))
         hero = theme["hero"]
         hero_name = sprite(name + "_hero", raster(hero["w"], hero["h"], hero["svg"], 138, 74))

@@ -370,7 +370,7 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
   snprintf(counts, sizeof(counts), tr(STR_LIBRARY_BOOKS_COUNT), static_cast<unsigned>(rowCount()));
   snprintf(finished, sizeof(finished), tr(STR_LIBRARY_FINISHED_COUNT), static_cast<unsigned>(allCompleted));
   collectionScratch.assign(counts);
-  collectionScratch.append(" ? ").append(finished);
+  collectionScratch.append(" · ").append(finished);
   drawBookLabel(collectionScratch.c_str(), library_shelf::FONT_SMALL, all.x + 82, all.y + 31, all.width - 110);
   renderer.drawLine(all.right() - 21, all.y + 23, all.right() - 15, all.y + 29);
   renderer.drawLine(all.right() - 15, all.y + 29, all.right() - 21, all.y + 35);
@@ -435,7 +435,7 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
     snprintf(counts, sizeof(counts), tr(STR_LIBRARY_BOOKS_COUNT), static_cast<unsigned>(group.count));
     snprintf(finished, sizeof(finished), tr(STR_LIBRARY_FINISHED_COUNT), static_cast<unsigned>(group.completed));
     collectionScratch.assign(counts);
-    if (group.completed) collectionScratch.append(" ? ").append(finished);
+    if (group.completed) collectionScratch.append(" · ").append(finished);
     drawBookLabel(collectionScratch.c_str(), library_shelf::FONT_SMALL, plateX + 10, floor + 57, art.plate->width - 20,
                   true);
     if (showSelection && collectionSelection == groupIndex + 1)

@@ -1033,6 +1033,7 @@ void LibraryActivity::handleInput(const LibraryInputBuffer::Event& input) {
       if (selection >= CONTROL_COUNT) {
         const int nextPage = pageStartForRow(selection - CONTROL_COUNT);
         if (nextPage != gridPageStart) {
+          uiReady = false;
           loadedGridPageStart = -1;
           nextGridCoverRow = -1;
         }
@@ -1185,7 +1186,7 @@ void LibraryActivity::buildSortHeader(UiApp::ScreenType& screen) {
   const fui::Rect method{static_cast<int16_t>(band.x + 12), band.y, static_cast<int16_t>(direction.x - band.x - 12),
                          band.height};
   char label[128];
-  snprintf(label, sizeof(label), "%s: %s", tr(STR_LIBRARY_SORT_BY), sortLabel());
+  snprintf(label, sizeof(label), "%s %s", tr(STR_LIBRARY_SORT_BY), sortLabel());
   drawBookLabel(label, library_shelf::FONT_BODY, method.x, method.y + 11, method.width - 12);
   const int cy = band.y + band.height / 2, dx = direction.x + 22;
   renderer.drawLine(dx, cy - 8, dx, cy + 8);

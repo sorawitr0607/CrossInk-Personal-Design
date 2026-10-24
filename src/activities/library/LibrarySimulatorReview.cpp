@@ -12,6 +12,7 @@
 #include "LibraryActivity.h"
 #include "LibraryFonts.h"
 #include "LibrarySettingsActivity.h"
+#include "activities/home/RecentBookProgress.h"
 #include "activities/reader/BookReadingStats.h"
 
 void LibraryActivity::runSimulatorLibraryReview() {
@@ -46,6 +47,7 @@ void LibraryActivity::runSimulatorLibraryReview() {
     BookReadingStats stats;
     stats.isCompleted = i % 3 == 0;
     check(stats.save(cache), "Cannot save fixture finished state");
+    if (i % 3 == 1) RecentBookProgress::saveCachedEpubPercent(cache, 42.6f);
   }
   invalidateCompletion();
   const auto paint = [&] { render(std::move(reviewLock)); };
@@ -95,6 +97,10 @@ void LibraryActivity::runSimulatorLibraryReview() {
       capture(name);
       check(visibleBookCount > 0 && visibleBookCount <= library_shelf::MAX_VISIBLE_BOOKS, "Visible hit budget");
       if (theme == 0 && view == library_shelf::Shelf) {
+        bool cachedPercentSeen = false;
+        for (int slot = 0; slot < visibleBookCount; ++slot)
+          cachedPercentSeen = cachedPercentSeen || pageProgress[slot] == 43;
+        check(cachedPercentSeen, "Saved reading percentage rounds consistently with Home");
         selection = 0;
         showSelection = false;
         const auto cell = bookCells[0];
@@ -108,6 +114,8 @@ void LibraryActivity::runSimulatorLibraryReview() {
       }
       check(bookPageCount > 1, "Fixture exercises multiple book pages");
       moveBookPage(2);
+      loadGridPageCovers();
+      check(nextGridCoverRow == -1, "Page I/O waits for the new frame");
       paint();
       check(bookPageIndex == bookPageCount - 1, "Last page");
       moveBookPage(-2);

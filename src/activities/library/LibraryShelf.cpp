@@ -155,6 +155,7 @@ void LibraryActivity::moveBookPage(const int direction) {
   bookPageIndex = next;
   gridPageStart = pageCacheFallback || !bookPages ? next * gridPageSize() : bookPages[next];
   selection = CONTROL_COUNT + gridPageStart;
+  uiReady = false;
   showSelection = !mappedInput.hasTouchHardware();
   loadedGridPageStart = -1;
   nextGridCoverRow = -1;
@@ -414,7 +415,7 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
 }
 
 void LibraryActivity::loadGridPageCovers() {
-  if (!gridEnabled() || gridCoverWidth <= 0 || gridCoverHeight <= 0 || visibleBookCount == 0) return;
+  if (!uiReady || !gridEnabled() || gridCoverWidth <= 0 || gridCoverHeight <= 0 || visibleBookCount == 0) return;
   if (nextGridCoverRow < 0 && loadedGridPageStart != gridPageStart) nextGridCoverRow = 0;
   if (nextGridCoverRow >= 0 && nextGridCoverRow < visibleBookCount) {
     const auto& cell = bookCells[nextGridCoverRow++];
@@ -440,7 +441,7 @@ void LibraryActivity::loadGridPageCovers() {
       const float percent = FsHelpers::hasEpubExtension(rowScratch.path)
                                 ? RecentBookProgress::loadCachedEpubPercent(rowScratch)
                                 : RecentBookProgress::loadPercent(rowScratch);
-      pageProgress[slot] = percent < 0 ? -1 : static_cast<int8_t>(std::clamp(static_cast<int>(percent), 0, 100));
+      pageProgress[slot] = percent < 0 ? -1 : static_cast<int8_t>(std::clamp(static_cast<int>(percent + 0.5f), 0, 100));
       pageProgressChanged = pageProgressChanged || percent >= 0;
     }
     if (nextProgressSlot == visibleBookCount && pageProgressChanged) {
