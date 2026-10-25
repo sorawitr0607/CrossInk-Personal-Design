@@ -13,7 +13,11 @@ inline constexpr GridPreset GRID_PRESETS[] = {{2, 2}, {3, 2}, {2, 3}, {3, 3}, {4
 inline constexpr uint8_t GRID_PRESET_COUNT = sizeof(GRID_PRESETS) / sizeof(GRID_PRESETS[0]);
 
 enum View : uint8_t { Shelf, Covers, List, ViewCount };
-enum Theme : uint8_t { Cozy, Botanical, Oak, Autumn, Ukiyoe, ThemeCount };
+// Preserve the original SD settings IDs; Autumn was 3 in library.1.
+enum Theme : uint8_t { Cozy = 0, Autumn = 3 };
+inline constexpr Theme THEME_IDS[] = {Cozy, Autumn};
+inline constexpr uint8_t ThemeCount = sizeof(THEME_IDS) / sizeof(THEME_IDS[0]);
+constexpr int themeIndex(const uint8_t theme) { return theme == Autumn ? 1 : 0; }
 enum Background : uint8_t { Off, Quiet, Illustrated, BackgroundCount };
 inline constexpr int MAX_VISIBLE_BOOKS = 32;
 
@@ -35,6 +39,8 @@ struct Geometry {
   int cellHeight;
   int coverWidth;
   int coverHeight;
+  bool natural = false;
+  int ornamentWidth = 0;
 };
 
 constexpr int atLeastOne(const int value) { return value > 0 ? value : 1; }
@@ -51,6 +57,16 @@ constexpr Geometry geometry(const int width, const int height, const uint8_t col
   return {c, r, cellWidth, cellHeight, coverWidth, coverHeight};
 }
 
+constexpr Geometry shelfGeometry(const int width, const int height, const uint8_t cols, const uint8_t lines,
+                                 const bool ornaments) {
+  const int c = columns(cols), r = rows(lines);
+  const int cellHeight = atLeastOne((height - (r - 1) * 8) / r);
+  const int reserve = ornaments ? smaller(96, width / 4) : 0;
+  const int availableWidth = atLeastOne((width - reserve - (c - 1) * 9 - 16) / c);
+  const int coverWidth = atLeastOne(smaller(availableWidth, atLeastOne(cellHeight - 48) * 2 / 3));
+  return {c, r, atLeastOne(width / c), cellHeight, coverWidth, coverWidth * 3 / 2, true, reserve};
+}
+
 // Greedy shelf packing. Finished books take a narrow spine; every other book
 // keeps one full cover slot. The same cursor is used for pagination and drawing.
 struct ShelfCursor {
@@ -58,27 +74,43 @@ struct ShelfCursor {
   int line = 0;
   int count = 0;
   int lineCount = 0;
+  int faces = 0;
+  bool previousSpine = false;
 };
 struct Placement {
-  int x, line, width;
+  int x, line, width, height;
 };
 constexpr int spineWidth(const Geometry& geometry) {
   return smaller(30, geometry.coverWidth / 4 > 16 ? geometry.coverWidth / 4 : 16);
 }
 inline bool place(ShelfCursor& cursor, const Geometry& geometry, const int width, const int gap, const bool spine,
-                  Placement& out) {
+                  Placement& out, const uint32_t seed = 0) {
   if (cursor.count >= MAX_VISIBLE_BOOKS) return false;
-  const int itemWidth = spine ? spineWidth(geometry) : geometry.cellWidth;
-  if (cursor.x > 0 && (cursor.x + itemWidth > width || cursor.lineCount >= MAX_VISIBLE_BOOKS / geometry.rows)) {
+  // Decorative binding variation, not an estimate of the book's page count.
+  const int binding = smaller(30, (geometry.coverHeight / 8 + 2) + static_cast<int>(seed % 7));
+  const int itemWidth =
+      spine ? (geometry.natural ? smaller(geometry.coverWidth, binding < 14 ? 14 : binding) : spineWidth(geometry))
+      : geometry.natural ? geometry.coverWidth
+                         : geometry.cellWidth;
+  int spacing = cursor.x == 0 ? 0 : geometry.natural && spine && cursor.previousSpine ? 1 : gap;
+  if (cursor.x > 0 && (cursor.x + spacing + itemWidth > width - geometry.ornamentWidth ||
+                       cursor.lineCount >= MAX_VISIBLE_BOOKS / geometry.rows ||
+                       (geometry.natural && !spine && cursor.faces >= geometry.columns))) {
     cursor.x = 0;
     cursor.lineCount = 0;
+    cursor.faces = 0;
+    spacing = 0;
     ++cursor.line;
   }
   if (cursor.line >= geometry.rows) return false;
-  out = {cursor.x, cursor.line, itemWidth};
-  cursor.x += itemWidth + gap;
+  const int itemHeight = geometry.natural && spine ? geometry.coverHeight * (84 + static_cast<int>(seed % 15)) / 100
+                                                   : geometry.coverHeight;
+  out = {cursor.x + spacing, cursor.line, itemWidth, itemHeight};
+  cursor.x += spacing + itemWidth;
   ++cursor.count;
   ++cursor.lineCount;
+  if (!spine) ++cursor.faces;
+  cursor.previousSpine = spine;
   return true;
 }
 

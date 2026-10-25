@@ -38,7 +38,9 @@ bool LibraryActivity::readCollectionValue(const library::ClixRecord& record, con
                                           std::string& value) {
   value.clear();
   if (kind == CollectionKind::Series) return index.readSeries(record, value);
-  if (kind == CollectionKind::Authors) return index.readAuthor(record, value);
+  // An empty author is valid metadata, not an I/O failure. Keep its books in
+  // Unknown Author instead of discarding every collection built so far.
+  if (kind == CollectionKind::Authors) return index.readAuthor(record, value) || !index.ioFailed();
   if (kind == CollectionKind::Folders) {
     if (!index.readPath(record, value)) return false;
     const auto slash = value.find_last_of('/');
@@ -315,23 +317,19 @@ void LibraryActivity::handleCollectionInput(const LibraryInputBuffer::Event& inp
 
 void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
   const auto heroBand = screen.take(fui::LayoutAnchor::Top, 80, 0);
-  static constexpr StrId themeLabels[] = {StrId::STR_LIBRARY_SHELF_COZY, StrId::STR_LIBRARY_SHELF_BOTANICAL,
-                                          StrId::STR_LIBRARY_SHELF_OAK, StrId::STR_LIBRARY_SHELF_AUTUMN,
-                                          StrId::STR_LIBRARY_SHELF_UKIYOE};
-  static constexpr StrId headlines[] = {StrId::STR_LIBRARY_WELCOME, StrId::STR_LIBRARY_WELCOME_BOTANICAL,
-                                        StrId::STR_LIBRARY_WELCOME_OAK, StrId::STR_LIBRARY_WELCOME_AUTUMN,
-                                        StrId::STR_LIBRARY_WELCOME_UKIYOE};
-  static constexpr StrId taglines[] = {StrId::STR_LIBRARY_TAGLINE_COZY, StrId::STR_LIBRARY_TAGLINE_BOTANICAL,
-                                       StrId::STR_LIBRARY_TAGLINE_OAK, StrId::STR_LIBRARY_TAGLINE_AUTUMN,
-                                       StrId::STR_LIBRARY_TAGLINE_UKIYOE};
-  const uint8_t theme = SETTINGS.libraryBookshelfTheme < library_shelf::ThemeCount ? SETTINGS.libraryBookshelfTheme : 0;
+  static constexpr StrId themeLabels[] = {StrId::STR_LIBRARY_SHELF_COZY, StrId::STR_LIBRARY_SHELF_AUTUMN};
+  static constexpr StrId headlines[] = {StrId::STR_LIBRARY_WELCOME, StrId::STR_LIBRARY_WELCOME_AUTUMN};
+  static constexpr StrId taglines[] = {StrId::STR_LIBRARY_TAGLINE_COZY, StrId::STR_LIBRARY_TAGLINE_AUTUMN};
+  const uint8_t theme = SETTINGS.libraryBookshelfTheme;
+  const auto themeChoice = library_shelf::themeIndex(theme);
   const auto& art = library_shelf::art(theme);
+  renderer.fillRect(heroBand.x + 8, heroBand.y + 2, heroBand.width - 16, heroBand.height - 4, false);
   const int heroWidth = SETTINGS.libraryOrnaments ? art.hero->width + 16 : 0;
-  drawBookLabel(I18N.get(themeLabels[theme]), library_shelf::FONT_SMALL, heroBand.x + 16, heroBand.y + 3,
+  drawBookLabel(I18N.get(themeLabels[themeChoice]), library_shelf::FONT_SMALL, heroBand.x + 16, heroBand.y + 3,
                 heroBand.width - heroWidth - 28);
-  drawBookLabel(I18N.get(headlines[theme]), library_shelf::FONT_HEADING, heroBand.x + 16, heroBand.y + 24,
+  drawBookLabel(I18N.get(headlines[themeChoice]), library_shelf::FONT_HEADING, heroBand.x + 16, heroBand.y + 24,
                 heroBand.width - heroWidth - 28);
-  drawBookLabel(I18N.get(taglines[theme]), library_shelf::FONT_SMALL, heroBand.x + 16, heroBand.y + 56,
+  drawBookLabel(I18N.get(taglines[themeChoice]), library_shelf::FONT_SMALL, heroBand.x + 16, heroBand.y + 56,
                 heroBand.width - heroWidth - 28);
   if (SETTINGS.libraryOrnaments)
     library_shelf::drawSprite(renderer, *art.hero, heroBand.right() - art.hero->width - 12,
@@ -350,9 +348,6 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
     renderer.drawText(library_shelf::FONT_SMALL, tab.x + (tab.width - textWidth) / 2, tab.y + 10, label, !active);
     screen.frame().hit(tab, ACTION_COLLECTION, static_cast<int16_t>(TAB_SERIES + i), fui::InputTouch);
   }
-  const auto background = screen.body();
-  library_shelf::drawWall(renderer, theme, SETTINGS.libraryBackground, background.x, background.y, background.width,
-                          background.height);
   const auto allBand = screen.take(fui::LayoutAnchor::Top, 74, 4);
   const int allWidth = std::min<int>(art.all->width, allBand.width - 24);
   const fui::Rect all{static_cast<int16_t>(allBand.x + (allBand.width - allWidth) / 2),

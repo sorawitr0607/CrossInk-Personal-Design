@@ -684,7 +684,12 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc, bool importingCrossPoint
   readLibraryChoice("libraryBookView", libraryBookView, 3);
   readLibraryChoice("libraryGridColumns", libraryGridColumns, 5);
   readLibraryChoice("libraryGridRows", libraryGridRows, 5);
-  readLibraryChoice("libraryBookshelfTheme", libraryBookshelfTheme, 5);
+  readLibraryChoice("libraryBookshelfTheme", libraryBookshelfTheme, 4);
+  // Keep Cozy=0 and Autumn=3 compatible with library.1 settings.
+  if (libraryBookshelfTheme != 0 && libraryBookshelfTheme != 3) {
+    libraryBookshelfTheme = 0;
+    needsResave = true;
+  }
   readLibraryChoice("libraryBackground", libraryBackground, 3);
   if (libraryGridColumns < 2) libraryGridColumns = 3;
   if (libraryGridRows < 2) libraryGridRows = 2;

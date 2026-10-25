@@ -842,6 +842,8 @@ void walk(WalkState& st, const std::string& path, const int depth) {
       continue;
     }
     if (!isBookName(name)) continue;
+    // The reader's generated export remains available in Files and Clippings.
+    if (path == "/" && name == "My Clippings.txt") continue;
 
     // A zero-length book is a dangling directory entry: the name enumerates but
     // the contents do not exist. Counted rather than silently dropped.

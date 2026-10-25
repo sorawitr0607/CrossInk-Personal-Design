@@ -13,7 +13,6 @@
 #include "LibraryActivity.h"
 #include "LibraryFonts.h"
 #include "LibraryShelfArt.h"
-#include "activities/home/BookActions.h"
 #include "activities/home/RecentBookProgress.h"
 #include "activities/reader/BookReadingStats.h"
 #include "fontIds.h"
@@ -33,6 +32,35 @@ void LibraryActivity::invalidateCompletion() {
   invalidateBookPages();
 }
 
+bool LibraryActivity::bookFinished(const RecentBook& book) {
+  const bool epub = FsHelpers::hasEpubExtension(book.path);
+  const bool xtc = FsHelpers::hasXtcExtension(book.path);
+  const bool text = FsHelpers::hasTxtExtension(book.path) || FsHelpers::hasMarkdownExtension(book.path);
+  if (epub) {
+    thumbnailScratch = Epub::resolveCachePathForFilePath(book.path, "/.crosspoint");
+  } else if (xtc || text) {
+    char path[64];
+    snprintf(path, sizeof(path), "/.crosspoint/%s_%llu", xtc ? "xtc" : "txt",
+             static_cast<unsigned long long>(std::hash<std::string>{}(book.path)));
+    thumbnailScratch.assign(path);
+  } else {
+    return false;
+  }
+  if (!Storage.exists(thumbnailScratch.c_str())) return false;
+  if (!text && BookReadingStats::load(thumbnailScratch).isCompleted) return true;
+  if (!epub) {
+    const auto length = thumbnailScratch.size();
+    thumbnailScratch.append("/progress.bin");
+    const bool hasProgress = Storage.exists(thumbnailScratch.c_str());
+    thumbnailScratch.resize(length);
+    // Never parse an unopened text book merely to determine its shelf status.
+    if (!hasProgress) return false;
+  }
+  const float percent = epub ? RecentBookProgress::loadCachedEpubPercent(book) : RecentBookProgress::loadPercent(book);
+  // Match the rounded percentage shown by Home and the Library badges.
+  return percent >= 99.5f;
+}
+
 bool LibraryActivity::completedOrdinal(const uint16_t ordinal) {
   if (!index.isOpen() || ordinal >= index.bookCount()) return false;
   if (completionBookCount != index.bookCount()) {
@@ -46,20 +74,8 @@ bool LibraryActivity::completedOrdinal(const uint16_t ordinal) {
   if (state & 1) return (state & 2) != 0;
   library::ClixRecord record{};
   bool completed = false;
-  if (index.readRecord(ordinal, record) && index.readPath(record, collectionScratch)) {
-    if (FsHelpers::hasEpubExtension(collectionScratch)) {
-      thumbnailScratch = Epub::resolveCachePathForFilePath(collectionScratch, "/.crosspoint");
-    } else if (FsHelpers::hasXtcExtension(collectionScratch)) {
-      char path[64];
-      snprintf(path, sizeof(path), "/.crosspoint/xtc_%llu",
-               static_cast<unsigned long long>(std::hash<std::string>{}(collectionScratch)));
-      thumbnailScratch.assign(path);
-    } else {
-      thumbnailScratch.clear();
-    }
-    if (!thumbnailScratch.empty() && Storage.exists(thumbnailScratch.c_str()))
-      completed = BookReadingStats::load(thumbnailScratch).isCompleted;
-  }
+  if (index.readRecord(ordinal, record) && index.readPath(record, rowScratch.path))
+    completed = bookFinished(rowScratch);
   completionBits[ordinal / 4] |= static_cast<uint8_t>((completed ? 3 : 1) << shift);
   return completed;
 }
@@ -68,7 +84,7 @@ bool LibraryActivity::completedRow(const int row) {
   if (row < 0 || row >= rowCount()) return false;
   if (sort != Sort::RecentlyRead) return completedOrdinal(ordinalForRow(row));
   if (!readBook(row, rowScratch)) return false;
-  return BookActions::isBookCompleted(rowScratch.path);
+  return bookFinished(rowScratch);
 }
 
 void LibraryActivity::invalidateBookPages() {
@@ -85,12 +101,16 @@ void LibraryActivity::ensureBookPages(const int width, const int height) {
   pageCacheHeight = height;
   const int count = rowCount();
   const bool list = SETTINGS.libraryBookView == library_shelf::List;
+  const bool shelf = SETTINGS.libraryBookView == library_shelf::Shelf;
   const bool dense = library_shelf::rows(SETTINGS.libraryGridRows) >= 3;
-  const int labelHeight = dense ? 22 : 44;
-  const int plankSpace = dense ? 22 : 30;
+  const int labelHeight = shelf ? 0 : dense ? 22 : 44;
+  const int plankSpace = shelf ? 24 : dense ? 22 : 30;
   const int headroom = dense ? 0 : 18;
-  const auto geometry = library_shelf::geometry(width, height, SETTINGS.libraryGridColumns, SETTINGS.libraryGridRows,
-                                                GAP, 7, labelHeight + plankSpace + headroom);
+  const auto geometry =
+      shelf ? library_shelf::shelfGeometry(width, height, SETTINGS.libraryGridColumns, SETTINGS.libraryGridRows,
+                                           SETTINGS.libraryOrnaments)
+            : library_shelf::geometry(width, height, SETTINGS.libraryGridColumns, SETTINGS.libraryGridRows, GAP, 7,
+                                      labelHeight + plankSpace + headroom);
   const int minimumPageSize = list ? gridPageSize() : geometry.columns * geometry.rows;
   const int capacity = library_shelf::pageCount(count, minimumPageSize) + 1;
   // At the index ceiling: <=16 KiB page starts (2x2), <=4 KiB row status.
@@ -112,7 +132,7 @@ void LibraryActivity::ensureBookPages(const int width, const int height) {
       } else {
         library_shelf::Placement placement{};
         const bool spine = SETTINGS.libraryBookView == library_shelf::Shelf && done;
-        if (!library_shelf::place(cursor, geometry, width, GAP, spine, placement)) {
+        if (!library_shelf::place(cursor, geometry, width, GAP, spine, placement, static_cast<uint32_t>(row))) {
           if (bookPageCount >= capacity) {
             // Defensive fallback even if a future layout violates the capacity proof.
             LOG_ERR("LIB", "Shelf page bound exceeded; using fixed cover pages");
@@ -122,7 +142,7 @@ void LibraryActivity::ensureBookPages(const int width, const int height) {
           }
           bookPages[bookPageCount++] = row;
           cursor = {};
-          (void)library_shelf::place(cursor, geometry, width, GAP, spine, placement);
+          (void)library_shelf::place(cursor, geometry, width, GAP, spine, placement, static_cast<uint32_t>(row));
         }
       }
     }
@@ -207,7 +227,8 @@ void LibraryActivity::formatBookMetadata(const int row, const bool includeAuthor
 
 void LibraryActivity::drawBookPager(UiApp::ScreenType& screen, const fui::Rect& area, const int current,
                                     const int total) {
-  renderer.fillRect(area.x, area.y, area.width, area.height, false);
+  renderer.fillRect(area.x + 8, area.y + 1, area.width - 16, area.height - 2, false);
+  renderer.drawRect(area.x + 8, area.y + 1, area.width - 16, area.height - 2);
   char label[32];
   snprintf(label, sizeof(label), tr(STR_LIBRARY_PAGE_COUNT), static_cast<unsigned>(current + 1),
            static_cast<unsigned>(total));
@@ -253,15 +274,19 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
   const char* captionText = mappedInput.hasTouchHardware()           ? tr(STR_LIBRARY_TAP_HINT)
                             : collectionScope == CollectionKind::All ? tr(STR_LIBRARY_ALL_BOOKS)
                                                                      : collectionTitle.c_str();
+  if (showSelection && selection >= CONTROL_COUNT && readBook(selection - CONTROL_COUNT, rowScratch))
+    captionText = rowScratch.title.c_str();
+  renderer.fillRect(caption.x + 8, caption.y, caption.width - 16, caption.height, false);
   drawBookLabel(captionText, library_shelf::FONT_SMALL, caption.x + 12, caption.y + 2, caption.width - 24);
-  library_shelf::drawWall(renderer, SETTINGS.libraryBookshelfTheme, SETTINGS.libraryBackground, area.x, area.y,
-                          area.width, area.height);
   const bool dense = library_shelf::rows(SETTINGS.libraryGridRows) >= 3;
-  const int labelHeight = dense ? 22 : 44;
-  const int plankSpace = dense ? 22 : 30;
+  const int labelHeight = shelf ? 0 : dense ? 22 : 44;
+  const int plankSpace = shelf ? 24 : dense ? 22 : 30;
   const int headroom = dense ? 0 : 18;
-  const auto geometry = library_shelf::geometry(area.width, area.height, SETTINGS.libraryGridColumns,
-                                                SETTINGS.libraryGridRows, GAP, 7, labelHeight + plankSpace + headroom);
+  const auto geometry =
+      shelf ? library_shelf::shelfGeometry(area.width, area.height, SETTINGS.libraryGridColumns,
+                                           SETTINGS.libraryGridRows, SETTINGS.libraryOrnaments)
+            : library_shelf::geometry(area.width, area.height, SETTINGS.libraryGridColumns, SETTINGS.libraryGridRows,
+                                      GAP, 7, labelHeight + plankSpace + headroom);
   const int coverWidth = list ? 30 : geometry.coverWidth;
   const int coverHeight = list ? 44 : geometry.coverHeight;
   if (coverWidth != gridCoverWidth || coverHeight != gridCoverHeight) {
@@ -279,27 +304,28 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
     for (int line = 0; line < geometry.rows; ++line) {
       const int floor = area.y + (line + 1) * geometry.cellHeight + line * GAP - labelHeight - plankSpace;
       library_shelf::drawPlank(renderer, SETTINGS.libraryBookshelfTheme, area.x + 4, floor, area.width - 8, false);
-      library_shelf::drawPlank(renderer, SETTINGS.libraryBookshelfTheme, area.x + 4, floor, area.width - 8, true);
     }
   }
   for (int row = gridPageStart; row < pageEnd && visibleBookCount < library_shelf::MAX_VISIBLE_BOOKS; ++row) {
     const bool done = !pageCacheFallback && rowCompletion && (rowCompletion[row / 8] & (1u << (row % 8)));
     const bool spine = shelf && done && !pageCacheFallback;
     library_shelf::Placement placement{};
-    if (!list && !library_shelf::place(cursor, geometry, area.width, GAP, spine, placement)) break;
+    if (!list && !library_shelf::place(cursor, geometry, area.width, GAP, spine, placement, static_cast<uint32_t>(row)))
+      break;
     const int slot = visibleBookCount++;
     const int floor =
         list ? area.y + slot * rowHeight + 49
              : area.y + (placement.line + 1) * geometry.cellHeight + placement.line * GAP - labelHeight - plankSpace;
     const int x =
         list ? area.x + 8 : area.x + placement.x + (placement.width - (spine ? placement.width : coverWidth)) / 2;
-    const int y = floor - coverHeight;
+    const int itemHeight = spine ? placement.height : coverHeight;
+    const int y = floor - itemHeight;
     const int width = spine ? placement.width : coverWidth;
     bookCells[slot] = {static_cast<int16_t>(row),
                        static_cast<int16_t>(x),
                        static_cast<int16_t>(y),
                        static_cast<int16_t>(width),
-                       static_cast<int16_t>(coverHeight),
+                       static_cast<int16_t>(itemHeight),
                        static_cast<int16_t>(placement.line),
                        spine,
                        done};
@@ -314,15 +340,17 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
     }
     if (list) renderer.fillRect(area.x, area.y + slot * rowHeight, area.width, rowHeight - 1, false);
     if (spine) {
-      renderer.fillRect(x, y, width, coverHeight, false);
-      renderer.drawRect(x, y, width, coverHeight);
-      renderer.drawLine(x + 3, y + 3, x + 3, floor - 3);
-      renderer.drawLine(x + 2, y + 8, x + width - 2, y + 8);
-      renderer.drawLine(x + 2, floor - 8, x + width - 2, floor - 8);
+      const bool dark = row % 3 != 0;
+      renderer.fillRect(x + 2, y + 2, width, itemHeight, true);
+      renderer.fillRect(x, y, width, itemHeight, dark);
+      renderer.drawRect(x, y, width, itemHeight);
+      renderer.drawLine(x + 3, y + 3, x + 3, floor - 3, 1, !dark);
+      renderer.drawLine(x + 2, y + 8, x + width - 2, y + 8, 1, !dark);
+      renderer.drawLine(x + 2, floor - 8, x + width - 2, floor - 8, 1, !dark);
       // Rotate a bounded title into the actual spine height; never infer page counts.
       subtitleScratch.assign(rowScratch.title);
       while (!subtitleScratch.empty() &&
-             renderer.getTextWidth(library_shelf::FONT_SMALL, subtitleScratch.c_str()) > coverHeight - 24) {
+             renderer.getTextWidth(library_shelf::FONT_SMALL, subtitleScratch.c_str()) > itemHeight - 24) {
         size_t last = subtitleScratch.size() - 1;
         while (last > 0 && (static_cast<unsigned char>(subtitleScratch[last]) & 0xc0) == 0x80) --last;
         subtitleScratch.resize(last);
@@ -330,8 +358,13 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
       const int textWidth = renderer.getTextWidth(library_shelf::FONT_SMALL, subtitleScratch.c_str());
       renderer.drawTextRotated90CW(library_shelf::FONT_SMALL,
                                    x + (width - renderer.getLineHeight(library_shelf::FONT_SMALL)) / 2,
-                                   y + (coverHeight + textWidth) / 2, subtitleScratch.c_str(), true);
+                                   y + (itemHeight + textWidth) / 2, subtitleScratch.c_str(), !dark);
     } else {
+      if (shelf) {
+        renderer.fillRect(x + 3, y + 3, width, coverHeight, true);
+        renderer.fillRect(x + 2, y - 2, width - 2, 3, false);
+        renderer.drawLine(x + 2, y - 2, x + width - 1, y - 2);
+      }
       renderer.fillRect(x, y, width, coverHeight, false);
       if (!drawCachedCover(rowScratch, x, y, width, coverHeight)) {
         renderer.drawRect(x, y, width, coverHeight);
@@ -362,14 +395,16 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
       }
       renderer.drawLine(area.x, area.y + (slot + 1) * rowHeight - 1, area.right(), area.y + (slot + 1) * rowHeight - 1);
     } else if (!spine) {
-      const int labelX = area.x + placement.x;
-      renderer.fillRect(labelX, floor + plankSpace, placement.width, labelHeight, false);
-      drawBookLabel(rowScratch.title.c_str(), library_shelf::FONT_SMALL, labelX + 2, floor + plankSpace + 1,
-                    placement.width - 4, true);
-      if (labelHeight > 24) {
-        formatBookMetadata(row, false);
-        drawBookLabel(collectionScratch.c_str(), library_shelf::FONT_SMALL, labelX + 2, floor + plankSpace + 21,
+      if (!shelf) {
+        const int labelX = area.x + placement.x;
+        renderer.fillRect(labelX, floor + plankSpace, placement.width, labelHeight, false);
+        drawBookLabel(rowScratch.title.c_str(), library_shelf::FONT_SMALL, labelX + 2, floor + plankSpace + 1,
                       placement.width - 4, true);
+        if (labelHeight > 24) {
+          formatBookMetadata(row, false);
+          drawBookLabel(collectionScratch.c_str(), library_shelf::FONT_SMALL, labelX + 2, floor + plankSpace + 21,
+                        placement.width - 4, true);
+        }
       }
       if (SETTINGS.libraryStatusBadges) {
         const int badgeWidth = std::min(width - 4, 62);
@@ -384,17 +419,18 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
         drawBookLabel(status, library_shelf::FONT_SMALL, x + width - badgeWidth, y + 2, badgeWidth - 4, true);
       }
     }
-    if (showSelection && row == selectedRow) renderer.drawRect(x - 3, y - 3, width + 6, coverHeight + 6, 2, true);
+    if (showSelection && row == selectedRow) renderer.drawRect(x - 3, y - 3, width + 6, itemHeight + 6, 2, true);
     const fui::Rect hit =
         list ? fui::Rect{area.x, static_cast<int16_t>(area.y + slot * rowHeight), area.width,
                          static_cast<int16_t>(rowHeight)}
              : fui::Rect{static_cast<int16_t>(x - 3), static_cast<int16_t>(y - 3), static_cast<int16_t>(width + 6),
-                         static_cast<int16_t>(coverHeight + labelHeight + plankSpace + 3)};
+                         static_cast<int16_t>(itemHeight + (shelf ? 3 : labelHeight + plankSpace + 3))};
     screen.frame().hit(hit, ACTION_ROW, static_cast<int16_t>(row), fui::InputTouch | fui::InputLongPress);
   }
   if (!list) {
     for (int line = 0; line < geometry.rows; ++line) {
       const int floor = area.y + (line + 1) * geometry.cellHeight + line * GAP - labelHeight - plankSpace;
+      library_shelf::drawPlank(renderer, SETTINGS.libraryBookshelfTheme, area.x + 4, floor, area.width - 8, true);
       int used = 0;
       for (int i = 0; i < visibleBookCount; ++i)
         if (bookCells[i].line == line) used = std::max<int>(used, bookCells[i].x + bookCells[i].width - area.x + GAP);
@@ -409,7 +445,7 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
             const auto& first = bookCells[i];
             if (first.line != 0 || first.spine) continue;
             library_shelf::drawOrnament(renderer, SETTINGS.libraryBookshelfTheme, 3, bookPageIndex, first.x,
-                                        first.y - 1, first.width, std::min(32, first.y - area.y - 2));
+                                        first.y - 1, first.width, std::min(64, first.y - area.y - 2));
             break;
           }
         }

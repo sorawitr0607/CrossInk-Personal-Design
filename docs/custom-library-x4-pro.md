@@ -21,11 +21,20 @@ activity have no intentional behavior changes.
 - Refresh, Search, Settings, Display, and Show Files remain available.
 - Book view, grid dimensions, and shelf theme are Library-specific settings.
   Grid dimensions mean columns by rows, defaulting to 3 by 2.
-- Shelf, Covers and List work with every sort. Shelf displays finished books
-  as compact spines; Covers keeps one full cover per grid slot. Shelf spines
-  have a standard width because the Library index does not store page counts.
-- Themes are Cozy Nook (default), Botanical, Oak Study, Autumn Harvest and
-  Ukiyo-e Print, using the original approved v5 illustrations. Background can
+- Shelf, Covers and List work with every sort. Shelf mixes tightly grouped
+  finished-book spines, face-out covers and ornaments on shared wooden planks,
+  following the v6 reference. Columns cap face-out covers per shelf; rows set
+  the number of shelves. Covers keeps its regular grid and title labels.
+  Binding heights and widths vary decoratively, without inventing page counts.
+- Finished means either the explicit Finished flag or saved progress that
+  rounds to 100%. Spines, finished counts and Hide Finished use the same rule.
+- Missing authors appear in Unknown Author without clearing other collections.
+  The generated root My Clippings.txt export is excluded from the Library index
+  and Library recent view; it remains available through Files and Clippings.
+- Themes are Cozy Nook (default) and Autumn Harvest, using original v6 artwork.
+  Existing Autumn settings keep their original ID; removed themes use Cozy.
+  Wallpaper reaches the screen edges behind the footer and page controls.
+  Background can
   be Illustrated, Quiet or Off. Ornaments and status badges have separate toggles.
 - Tap a book to select it, then tap again to open. Long press retains the
   original book actions. Collections open with one tap. First, previous, next
@@ -38,7 +47,7 @@ one repaint after a cold cover batch. Cached percentages are read with the
 visible rows, so warm cover caches do not queue an extra repaint. There is no
 animation or periodic refresh. Browsing an unopened cover does not add a recent
 history entry. Battery life still needs measurement on a physical reader.
-Five themes use 179,938 bytes
+Two themes use 74,276 bytes
 of packed flash masks with no SVG parser, runtime resize, animation or extra
 framebuffer. Library text uses three small one-bit bitmap font sizes in flash,
 registered only for the Library visit. It does not activate a scalable font
@@ -59,9 +68,9 @@ cppcheck, checks the shared code with a C3 build, then builds `x4-pro` and the
 native X4 Pro simulator. Simulator checks use generated books in a temporary
 card and capture actual one-bit Library output; no personal books are included.
 
-Successful runs provide the `crossink-1.6.1-library.1-x4-pro` artifact containing:
+Successful runs provide the `crossink-1.6.1-library.2-x4-pro` artifact containing:
 
-- `firmware-x4-pro-v1.6.1-library.1.bin`: the X4 Pro application image.
+- `firmware-x4-pro-v1.6.1-library.2.bin`: the X4 Pro application image.
 - `SHA256SUMS.txt` and `manifest.json`: integrity and build provenance.
 - `source.patch`: the exact patch against the pinned base, including formatting
   applied during the build.
@@ -84,9 +93,11 @@ image decoding on hardware, or battery usage.
 3. Copy the `.bin` to the SD card and safely eject it.
 4. On the reader, open Settings, System, SD Card Firmware Update, then select the
    custom `.bin`. Keep the reader charged and allow the update to finish.
-5. Open Library and verify the tabs, spread covers, and All Books. Open one
+5. Open Library and tap Refresh once so any retained older index drops the
+   clipping export. Verify Authors, including Unknown Author, and a book showing
+   100% progress as a spine in Shelf view. Open one
    collection, try Title, Series, and Recently Opened sorting, and change the
-   grid size, five shelf themes, backgrounds and ornaments in Library Settings.
+   grid size, the two shelf themes, backgrounds and ornaments in Library Settings.
 6. Check Search, Refresh, file-type toggles, Back navigation, and saved settings
    after a restart. Confirm an unopened cover did not add a recent-history entry.
    Check an existing book's progress, bookmarks, and reading statistics.

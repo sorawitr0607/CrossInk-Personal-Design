@@ -4,7 +4,14 @@
 
 - Open Library to Series, Authors, and SD Folder collections with stacked cover thumbnails and an All Books shortcut.
 - Choose a Library-only book grid from 2 x 2 to 4 x 4, plus Shelf, Covers and List views for every sort.
-- Use five illustrated bookshelf themes: Cozy Nook, Botanical, Oak Study, Autumn Harvest and Ukiyo-e Print, with independent backgrounds, ornaments and status badges.
+- Use Cozy Nook and Autumn Harvest with the v6 illustrations, full-screen wallpaper, ornaments and status badges.
+
+### Fixed
+
+- Render books at displayed 100% progress as spines even without a manual Finished flag; use the same completion rule for counts and Hide Finished.
+- Keep Authors populated when a book has no author metadata, with an Unknown Author collection for those books.
+- Exclude the generated root My Clippings.txt export from Library books while retaining ordinary TXT books and the Clippings feature.
+- Extend wallpaper behind the bottom controls and footer. Pack covers and varied spines together on wooden shelves, with space for ornaments.
 
 ### Changed
 

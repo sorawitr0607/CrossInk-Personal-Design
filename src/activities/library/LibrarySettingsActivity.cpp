@@ -16,9 +16,7 @@ constexpr uint8_t ROW_ORDER[ROW_COUNT] = {0, 3, 4, 5, 2, 10, 11, 12, 13, 14, 1, 
 constexpr StrId GRID_LABELS[] = {StrId::STR_LIBRARY_GRID_2_2, StrId::STR_LIBRARY_GRID_3_2, StrId::STR_LIBRARY_GRID_2_3,
                                  StrId::STR_LIBRARY_GRID_3_3, StrId::STR_LIBRARY_GRID_4_2, StrId::STR_LIBRARY_GRID_2_4,
                                  StrId::STR_LIBRARY_GRID_4_3, StrId::STR_LIBRARY_GRID_3_4, StrId::STR_LIBRARY_GRID_4_4};
-constexpr StrId SHELF_LABELS[] = {StrId::STR_LIBRARY_SHELF_COZY, StrId::STR_LIBRARY_SHELF_BOTANICAL,
-                                  StrId::STR_LIBRARY_SHELF_OAK, StrId::STR_LIBRARY_SHELF_AUTUMN,
-                                  StrId::STR_LIBRARY_SHELF_UKIYOE};
+constexpr StrId SHELF_LABELS[] = {StrId::STR_LIBRARY_SHELF_COZY, StrId::STR_LIBRARY_SHELF_AUTUMN};
 constexpr StrId VIEW_LABELS[] = {StrId::STR_LIBRARY_VIEW_SHELF, StrId::STR_LIBRARY_VIEW_COVERS, StrId::STR_LIST_VIEW};
 constexpr StrId BACKGROUND_LABELS[] = {StrId::STR_OFF, StrId::STR_LIBRARY_BACKGROUND_QUIET,
                                        StrId::STR_LIBRARY_BACKGROUND_ILLUSTRATED};
@@ -124,17 +122,16 @@ void LibrarySettingsActivity::chooseGridSize() {
 }
 
 void LibrarySettingsActivity::chooseShelfTheme() {
-  choicePopup.show(
-      StrId::STR_LIBRARY_SHELF_THEME, SHELF_LABELS, library_shelf::ThemeCount,
-      SETTINGS.libraryBookshelfTheme < library_shelf::ThemeCount ? SETTINGS.libraryBookshelfTheme : library_shelf::Cozy,
-      [this](const int selected) {
-        if (selected < 0 || selected >= library_shelf::ThemeCount) return;
-        if (SETTINGS.libraryBookshelfTheme != selected) {
-          SETTINGS.libraryBookshelfTheme = static_cast<uint8_t>(selected);
-          if (!SETTINGS.saveToFile()) LOG_ERR("LIB", "Cannot save Library shelf theme");
-        }
-        requestUpdate();
-      });
+  choicePopup.show(StrId::STR_LIBRARY_SHELF_THEME, SHELF_LABELS, library_shelf::ThemeCount,
+                   library_shelf::themeIndex(SETTINGS.libraryBookshelfTheme), [this](const int selected) {
+                     if (selected < 0 || selected >= library_shelf::ThemeCount) return;
+                     const uint8_t theme = library_shelf::THEME_IDS[selected];
+                     if (SETTINGS.libraryBookshelfTheme != theme) {
+                       SETTINGS.libraryBookshelfTheme = theme;
+                       if (!SETTINGS.saveToFile()) LOG_ERR("LIB", "Cannot save Library shelf theme");
+                     }
+                     requestUpdate();
+                   });
   requestUpdate();
 }
 
@@ -261,9 +258,7 @@ void LibrarySettingsActivity::provideRow(void*, const uint16_t row, fui::ListIte
     return;
   }
   if (logical == 11) {
-    item.value = I18N.get(
-        SHELF_LABELS[SETTINGS.libraryBookshelfTheme < library_shelf::ThemeCount ? SETTINGS.libraryBookshelfTheme
-                                                                                : library_shelf::Cozy]);
+    item.value = I18N.get(SHELF_LABELS[library_shelf::themeIndex(SETTINGS.libraryBookshelfTheme)]);
     return;
   }
   if (logical == 12) {

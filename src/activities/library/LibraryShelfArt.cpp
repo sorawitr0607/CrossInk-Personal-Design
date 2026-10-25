@@ -5,9 +5,10 @@
 #include <algorithm>
 
 #include "LibraryShelfAssets.generated.h"
+#include "LibraryShelfLayout.h"
 
 namespace library_shelf {
-const ThemeArt& art(const uint8_t theme) { return assets::THEMES[theme < 5 ? theme : 0]; }
+const ThemeArt& art(const uint8_t theme) { return assets::THEMES[themeIndex(theme)]; }
 
 void drawSprite(const GfxRenderer& renderer, const Sprite& sprite, const int x, const int y, const int sourceX,
                 const int width) {

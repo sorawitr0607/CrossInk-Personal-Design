@@ -21,11 +21,11 @@
 #include <functional>
 
 #include "LibraryFonts.h"
+#include "LibraryShelfArt.h"
 #include "activities/home/BookActions.h"
 #include "activities/home/FileBrowserActionActivity.h"
 #include "activities/home/RecentBookProgress.h"
 #include "activities/library/LibrarySettingsActivity.h"
-#include "activities/reader/BookReadingStats.h"
 #include "activities/reader/EpubReaderActivity.h"
 #include "activities/util/ConfirmationActivity.h"
 #include "activities/util/KeyboardEntryActivity.h"
@@ -308,6 +308,7 @@ void LibraryActivity::resolveRecents() {
   size_t lookupStart = SIZE_MAX;
   for (size_t row = 0; row < books.size() && recentCount < RecentBooksStore::MAX_RECENT_BOOKS; ++row) {
     const auto& book = books[row];
+    if (book.path == "/My Clippings.txt") continue;
     if ((library::fileTypeFor(book.path) & visibleTypes) == 0) continue;
     if (collectionScope != CollectionKind::All) {
       const size_t start =
@@ -350,7 +351,7 @@ void LibraryActivity::resolveRecents() {
       library::foldInto(combined, folded);
       if (!library::matchesQuery(folded, needle)) continue;
     }
-    if (SETTINGS.libraryHideFinishedBooks && BookActions::isBookCompleted(book.path)) continue;
+    if (SETTINGS.libraryHideFinishedBooks && bookFinished(book)) continue;
     recentRows[recentCount++] = static_cast<uint16_t>(row);
   }
 }
@@ -491,7 +492,6 @@ void LibraryActivity::applyFilter() {
   std::string author;
   std::string name;
   std::string path;
-  std::string cachePath;
   std::string combined;
   std::string folded;
   // Blob fields are byte-length-prefixed. Reserve once for the entire scan,
@@ -500,7 +500,6 @@ void LibraryActivity::applyFilter() {
   author.reserve(UINT8_MAX);
   name.reserve(UINT8_MAX);
   path.reserve(256);
-  cachePath.reserve(64);
   combined.reserve(2 * UINT8_MAX + 1);
   folded.reserve(2 * UINT8_MAX + 1);
   const auto readIndexedPath = [&](const library::ClixRecord& record) {
@@ -561,38 +560,7 @@ void LibraryActivity::applyFilter() {
     }
     // Only matching books need their completion state read from the SD card.
     if (!needle.empty() && !library::matchesQuery(folded, needle)) continue;
-    if (SETTINGS.libraryHideFinishedBooks) {
-      const uint8_t type = library::fileTypeFor(name);
-      cachePath.clear();
-      if (type == library::FileEpub) {
-        uint64_t pathHash = 0;
-        if (!index.readPathHash(record, pathHash)) {
-          LOG_ERR("LIB", "Cannot read Library book hash");
-          filterFailed = true;
-          filteredCount = 0;
-          break;
-        }
-        cachePath = "/.crosspoint/epub_" + std::to_string(pathHash);
-        if (!Storage.exists(cachePath.c_str())) {
-          // Older EPUB caches used std::hash. Reading their stats here avoids
-          // requiring the user to open each finished book to migrate its cache.
-          if (!readIndexedPath(record)) {
-            filterFailed = true;
-            filteredCount = 0;
-            break;
-          }
-          cachePath = "/.crosspoint/epub_" + std::to_string(std::hash<std::string>{}(path));
-        }
-      } else if (type == library::FileXtc) {
-        if (!readIndexedPath(record)) {
-          filterFailed = true;
-          filteredCount = 0;
-          break;
-        }
-        cachePath = Xtc(path, "/.crosspoint").getCachePath();
-      }
-      if (!cachePath.empty() && BookReadingStats::load(cachePath).isCompleted) continue;
-    }
+    if (SETTINGS.libraryHideFinishedBooks && completedOrdinal(ordinal)) continue;
     filterBits[row / 8] |= static_cast<uint8_t>(1u << (row % 8));
     filteredCount++;
   }
@@ -1181,6 +1149,7 @@ uint32_t LibraryActivity::groupForRow(const int row) {
 
 void LibraryActivity::buildSortHeader(UiApp::ScreenType& screen) {
   const auto band = screen.take(fui::LayoutAnchor::Top, 44);
+  renderer.fillRect(band.x, band.y, band.width, band.height, false);
   const int viewWidth = 132;
   const fui::Rect direction{static_cast<int16_t>(band.right() - viewWidth - 56), band.y, 44, band.height};
   const fui::Rect method{static_cast<int16_t>(band.x + 12), band.y, static_cast<int16_t>(direction.x - band.x - 12),
@@ -1396,7 +1365,10 @@ void LibraryActivity::render(RenderLock&&) {
   }
   for (int pass = 0; pass < 8; ++pass) {
     renderer.clearScreen();
+    library_shelf::drawWall(renderer, SETTINGS.libraryBookshelfTheme, SETTINGS.libraryBackground, 0, 0,
+                            renderer.getScreenWidth(), renderer.getScreenHeight());
     const auto header = TouchHeaderBackButton::headerRect(renderer, mappedInput);
+    renderer.fillRect(header.x, header.y, header.width, header.height, false);
     const char* heading = collectionsVisible                       ? tr(STR_LIBRARY)
                           : collectionScope == CollectionKind::All ? tr(STR_LIBRARY_ALL_BOOKS)
                                                                    : collectionTitle.c_str();
@@ -1432,8 +1404,10 @@ void LibraryActivity::render(RenderLock&&) {
   renderer.getOrientedViewableTRBL(&bounds[0], &bounds[1], &bounds[2], &bounds[3]);
   const int buttonHintsHeight =
       mappedInput.hasTouchHardware() ? 0 : UITheme::getInstance().getMetrics().buttonHintsHeight;
-  renderer.fillRect(0, renderer.getScreenHeight() - bounds[2] - buttonHintsHeight - FOOTER_HEIGHT,
-                    renderer.getScreenWidth(), FOOTER_HEIGHT, false);
+  const int footerWidth = renderer.getTextWidth(library_shelf::FONT_SMALL, footer) + 24;
+  renderer.fillRect((renderer.getScreenWidth() - footerWidth) / 2,
+                    renderer.getScreenHeight() - bounds[2] - buttonHintsHeight - FOOTER_HEIGHT, footerWidth,
+                    FOOTER_HEIGHT, false);
   renderer.drawCenteredText(library_shelf::FONT_SMALL,
                             renderer.getScreenHeight() - bounds[2] - buttonHintsHeight -
                                 (FOOTER_HEIGHT + renderer.getLineHeight(library_shelf::FONT_SMALL)) / 2,

@@ -68,8 +68,30 @@ void LibraryActivity::runSimulatorLibraryReview() {
   };
   regression(progressOnlyOrdinal != UINT16_MAX && completedOrdinal(progressOnlyOrdinal),
              "100-percent progress counts as finished without a manual Finished flag");
+  check(readIndexedBook(progressOnlyOrdinal, rowScratch), "Read percentage boundary fixture");
+  const auto percentCache = Epub::resolveCachePathForFilePath(rowScratch.path, "/.crosspoint");
+  RecentBookProgress::saveCachedEpubPercent(percentCache, 99.49f);
+  invalidateCompletion();
+  regression(!completedOrdinal(progressOnlyOrdinal), "A displayed 99 percent remains unfinished");
+  RecentBookProgress::saveCachedEpubPercent(percentCache, 99.5f);
+  invalidateCompletion();
+  regression(completedOrdinal(progressOnlyOrdinal), "Rounded 100 percent agrees with badges");
+  RecentBookProgress::saveCachedEpubPercent(percentCache, 100.0f);
+  invalidateCompletion();
   enterCollections(CollectionKind::Authors);
   regression(!collectionsFailed && collectionCount >= 3, "One missing author must not erase the Authors tab");
+  int unknownAuthor = -1;
+  for (int group = 0; group < collectionCount; ++group) {
+    library::ClixRecord record{};
+    if (index.readRecord(collections[group].leader, record) &&
+        readCollectionValue(record, CollectionKind::Authors, collectionScratch) && collectionScratch.empty())
+      unknownAuthor = group;
+  }
+  regression(unknownAuthor >= 0, "Missing metadata has an Unknown Author collection");
+  if (unknownAuthor >= 0) {
+    enterCollection(unknownAuthor);
+    regression(!filterFailed && rowCount() == 2, "Unknown Author opens both books without author metadata");
+  }
   enterCollection(-1);
   bool clippingVisible = false, txtBookVisible = false;
   for (int row = 0; row < rowCount(); ++row) {
@@ -78,6 +100,13 @@ void LibraryActivity::runSimulatorLibraryReview() {
     txtBookVisible = txtBookVisible || rowScratch.path == "/LibraryReview/Fables/Notes.txt";
   }
   regression(!clippingVisible && txtBookVisible, "Hide the clipping export while retaining legitimate TXT books");
+  SETTINGS.libraryHideFinishedBooks = true;
+  applyFilter();
+  bool finishedVisible = false;
+  for (int row = 0; row < rowCount(); ++row) finishedVisible = finishedVisible || completedRow(row);
+  regression(!finishedVisible && rowCount() > 0, "Hide Finished agrees with Shelf completion");
+  SETTINGS.libraryHideFinishedBooks = false;
+  applyFilter();
   check(regressionFailures == 0, "Library device regression scenarios");
   const auto paint = [&] { render(std::move(reviewLock)); };
   const auto settle = [&] {
@@ -105,7 +134,7 @@ void LibraryActivity::runSimulatorLibraryReview() {
     saveImage(name);
   };
   char name[80];
-  for (uint8_t theme = 0; theme < library_shelf::ThemeCount; ++theme) {
+  for (const auto theme : library_shelf::THEME_IDS) {
     SETTINGS.libraryBookshelfTheme = theme;
     SETTINGS.libraryBackground = library_shelf::Illustrated;
     SETTINGS.libraryOrnaments = true;
@@ -116,6 +145,11 @@ void LibraryActivity::runSimulatorLibraryReview() {
     check(collectionCount >= 3 && allCompleted > 0, "Metadata groups and real finished counts");
     snprintf(name, sizeof(name), "theme-%u-collections", theme);
     capture(name);
+    int bottomInk = 0;
+    for (int y = renderer.getScreenHeight() - 16; y < renderer.getScreenHeight(); ++y)
+      for (int x = 0; x < renderer.getScreenWidth(); ++x)
+        if ((x < 100 || x >= renderer.getScreenWidth() - 100) && renderer.isPixelBlack(x, y)) ++bottomInk;
+    check(bottomInk > 0, "Wallpaper reaches the bottom edge outside the footer text card");
     for (uint8_t view = 0; view < library_shelf::ViewCount; ++view) {
       SETTINGS.libraryGridColumns = 3;
       SETTINGS.libraryGridRows = 2;
@@ -127,9 +161,13 @@ void LibraryActivity::runSimulatorLibraryReview() {
       check(visibleBookCount > 0 && visibleBookCount <= library_shelf::MAX_VISIBLE_BOOKS, "Visible hit budget");
       if (theme == 0 && view == library_shelf::Shelf) {
         bool cachedPercentSeen = false;
+        bool progressOnlySpine = false;
         for (int slot = 0; slot < visibleBookCount; ++slot)
           cachedPercentSeen = cachedPercentSeen || pageProgress[slot] == 43;
+        for (int slot = 0; slot < visibleBookCount; ++slot)
+          if (ordinalForRow(bookCells[slot].row) == progressOnlyOrdinal) progressOnlySpine = bookCells[slot].spine;
         check(cachedPercentSeen, "Saved reading percentage rounds consistently with Home");
+        check(progressOnlySpine, "100-percent book is rendered as an actual spine");
         selection = 0;
         showSelection = false;
         const auto cell = bookCells[0];
@@ -236,6 +274,12 @@ void LibraryActivity::runSimulatorLibraryReview() {
   SETTINGS.fromJson(saved.as<JsonVariantConst>());
   check(SETTINGS.libraryBookView == library_shelf::Shelf && SETTINGS.libraryBookshelfTheme == library_shelf::Cozy,
         "Library settings round trip");
+  saved["libraryBookshelfTheme"] = 3;
+  SETTINGS.fromJson(saved.as<JsonVariantConst>());
+  check(SETTINGS.libraryBookshelfTheme == library_shelf::Autumn, "Existing Autumn theme ID is preserved");
+  saved["libraryBookshelfTheme"] = 1;
+  SETTINGS.fromJson(saved.as<JsonVariantConst>());
+  check(SETTINGS.libraryBookshelfTheme == library_shelf::Cozy, "Removed themes fall back to Cozy Nook");
   check(RECENT_BOOKS.getCount() == recentCountBefore, "Unopened covers never enter recent history");
   std::printf("LIBRARY REVIEW PASS: %u checks, %u native captures\n", checks, captures);
   std::fflush(stdout);

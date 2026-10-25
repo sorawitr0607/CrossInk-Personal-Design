@@ -23,6 +23,9 @@ int main() {
   check(pageCount(5, 4) == 2 && pageStart(4, 4) == 4, "fifth book moves to second 2 x 2 page");
   check(pageCount(0, 4) == 1 && pageStart(-1, 4) == 0, "empty libraries do not produce negative pages");
   check(pageCount(32767, 4) == 8192, "maximum library paginates without overflowing");
+  check(ThemeCount == 2 && THEME_IDS[0] == Cozy && THEME_IDS[1] == Autumn,
+        "Only Cozy Nook and Autumn Harvest remain available");
+  check(themeIndex(3) == 1 && themeIndex(1) == 0, "Autumn keeps its saved ID and removed themes use Cozy");
   for (int i = 0; i < GRID_PRESET_COUNT; ++i) {
     const auto preset = GRID_PRESETS[i];
     check(presetIndex(preset.columns, preset.rows) == i, "grid chooser preserves saved preset");
@@ -69,6 +72,46 @@ int main() {
         check(pages <= pageCount(32767, preset.columns * preset.rows), "page-start allocation bound holds");
         if (pattern == 0)
           check(pages == pageCount(32767, preset.columns * preset.rows), "Covers preserves the exact grid page count");
+      }
+    }
+  }
+  for (const auto preset : GRID_PRESETS) {
+    for (const bool ornaments : {false, true}) {
+      const auto layout = shelfGeometry(432, 550, preset.columns, preset.rows, ornaments);
+      for (int pattern = 0; pattern < 4; ++pattern) {
+        ShelfCursor cursor{};
+        int pages = 1, previousRight = 0, previousLine = -1, faces = 0;
+        bool previousSpine = false;
+        for (int book = 0; book < 32767; ++book) {
+          const bool spine = pattern == 0 ? false : pattern == 1 ? true : book % pattern == 0;
+          Placement placement{};
+          if (!place(cursor, layout, 432, 8, spine, placement, book)) {
+            check(cursor.count > 0, "natural shelf page makes progress");
+            cursor = {};
+            previousLine = -1;
+            ++pages;
+            check(place(cursor, layout, 432, 8, spine, placement, book), "fresh natural page accepts a book");
+          }
+          if (placement.line != previousLine) {
+            faces = 0;
+          } else {
+            check(placement.x >= previousRight + (spine && previousSpine ? 1 : 8),
+                  "spines group closely and covers have breathing room");
+          }
+          if (!spine) ++faces;
+          check(faces <= preset.columns, "chosen columns cap face-out covers on each shelf");
+          check(placement.x >= 0 && placement.x + placement.width <= 432, "natural books stay on their plank");
+          check(placement.x + placement.width <= 432 - layout.ornamentWidth, "keepsakes retain their own shelf space");
+          check(placement.height > 0 && placement.height <= layout.coverHeight, "varied spines fit shelf height");
+          check(cursor.count <= MAX_VISIBLE_BOOKS && placement.line < preset.rows, "natural shelf hit budget");
+          if (!spine) check(placement.width == layout.coverWidth, "Shelf packs cover widths rather than grid cells");
+          previousRight = placement.x + placement.width;
+          previousLine = placement.line;
+          previousSpine = spine;
+        }
+        check(pages <= pageCount(32767, preset.columns * preset.rows), "natural page cache stays within its bound");
+        if (pattern == 0)
+          check(pages == pageCount(32767, preset.columns * preset.rows), "all-cover Shelf honors the chosen grid");
       }
     }
   }

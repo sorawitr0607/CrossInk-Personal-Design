@@ -181,6 +181,7 @@ class LibraryActivity final : public Activity {
   void invalidateBookPages();
   void ensureBookPages(int width, int height);
   bool completedOrdinal(uint16_t ordinal);
+  bool bookFinished(const RecentBook& book);
   bool completedRow(int row);
   void invalidateCompletion();
   int pageStartForRow(int row) const;
