@@ -9,6 +9,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <iterator>
 #include <string_view>
 
 #include "LibraryActivity.h"
@@ -22,12 +23,11 @@ bool isBlockTag(const std::string_view tag) {
   static constexpr std::string_view blocks[] = {"p",          "br",      "div",     "li", "ul",  "ol",
                                                 "blockquote", "section", "article", "hr", "pre", "h1",
                                                 "h2",         "h3",      "h4",      "h5", "h6"};
-  for (const auto block : blocks)
-    if (tag.size() == block.size() && std::equal(tag.begin(), tag.end(), block.begin(), [](const char a, const char b) {
-          return std::tolower(static_cast<unsigned char>(a)) == b;
-        }))
-      return true;
-  return false;
+  return std::any_of(std::begin(blocks), std::end(blocks), [tag](const auto block) {
+    return tag.size() == block.size() &&
+           std::equal(tag.begin(), tag.end(), block.begin(),
+                      [](const char a, const char b) { return std::tolower(static_cast<unsigned char>(a)) == b; });
+  });
 }
 
 void plainBlurb(std::string& text) {
