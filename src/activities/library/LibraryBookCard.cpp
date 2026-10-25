@@ -48,7 +48,7 @@ void plainBlurb(std::string& text) {
   text.resize(output);
 }
 
-bool contains(const Rect& rect, const int x, const int y) {
+bool contains(const freeink::ui::Rect& rect, const int x, const int y) {
   return x >= rect.x && y >= rect.y && x < rect.x + rect.width && y < rect.y + rect.height;
 }
 }  // namespace
@@ -79,10 +79,14 @@ void LibraryActivity::prepareBookCard() {
   auto& card = *bookCard;
   const int width = std::min(440, renderer.getScreenWidth() - 24);
   const int height = std::min(440, renderer.getScreenHeight() - 80);
-  card.dialog = {(renderer.getScreenWidth() - width) / 2, (renderer.getScreenHeight() - height) / 2, width, height};
-  card.cover = {card.dialog.x + 16, card.dialog.y + 56, COVER_W, COVER_H};
-  card.openButton = {card.dialog.x + 16, card.dialog.y + height - 56, width - 152, 40};
-  card.closeButton = {card.dialog.x + width - 120, card.dialog.y + height - 56, 104, 40};
+  const auto rect = [](const int x, const int y, const int w, const int h) {
+    return freeink::ui::Rect{static_cast<int16_t>(x), static_cast<int16_t>(y), static_cast<int16_t>(w),
+                             static_cast<int16_t>(h)};
+  };
+  card.dialog = rect((renderer.getScreenWidth() - width) / 2, (renderer.getScreenHeight() - height) / 2, width, height);
+  card.cover = rect(card.dialog.x + 16, card.dialog.y + 56, COVER_W, COVER_H);
+  card.openButton = rect(card.dialog.x + 16, card.dialog.y + height - 56, width - 152, 40);
+  card.closeButton = rect(card.dialog.x + width - 120, card.dialog.y + height - 56, 104, 40);
   card.titleLines = renderer.wrappedText(library_shelf::FONT_BODY, card.book.title.c_str(), width - 160, 2);
   const char* description = card.description.empty() ? tr(STR_LIBRARY_CARD_NO_DESCRIPTION) : card.description.c_str();
   card.descriptionLines = renderer.wrappedText(library_shelf::FONT_SMALL, description, width - 32, 5);

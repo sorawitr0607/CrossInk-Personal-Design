@@ -168,7 +168,7 @@ class LibraryActivity final : public Activity {
     RecentBook book;
     std::string description, series, genre, seriesPosition;
     std::vector<std::string> titleLines, descriptionLines, authors;
-    Rect dialog{}, openButton{}, closeButton{}, cover{};
+    freeink::ui::Rect dialog{}, openButton{}, closeButton{}, cover{};
     int total = 0, finished = 0;
     float percent = -1;
     int coverTask = 0, previewCount = 0, pressed = 0;
