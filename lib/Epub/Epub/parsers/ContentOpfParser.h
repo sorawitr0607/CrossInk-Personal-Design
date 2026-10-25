@@ -19,6 +19,7 @@ class ContentOpfParser final : public Print {
     IN_BOOK_AUTHOR,
     IN_BOOK_LANGUAGE,
     IN_BOOK_SUBJECT,
+    IN_BOOK_DESCRIPTION,
     IN_BOOK_COLLECTION,
     IN_BOOK_COLLECTION_TYPE,
     IN_BOOK_COLLECTION_POSITION,
@@ -50,6 +51,9 @@ class ContentOpfParser final : public Print {
   bool authorTruncated = false;
   bool languageTruncated = false;
   bool subjectTruncated = false;
+  bool descriptionTruncated = false;
+  // Optional caller-owned text. Ordinary reader/index parses do not collect it.
+  std::string* description = nullptr;
   bool seriesTruncated = false;
   bool collectionTypeTruncated = false;
   bool collectionPositionTruncated = false;
@@ -127,12 +131,13 @@ class ContentOpfParser final : public Print {
 
   explicit ContentOpfParser(const std::string& cachePath, const std::string& baseContentPath, const size_t xmlSize,
                             BookMetadataCache* cache, const bool collectCssFiles = true,
-                            const bool metadataOnly = false)
+                            const bool metadataOnly = false, std::string* description = nullptr)
       : cachePath(cachePath),
         baseContentPath(baseContentPath),
         remainingSize(xmlSize),
         cache(cache),
         metadataOnly(metadataOnly),
+        description(description),
         collectCssFiles(collectCssFiles) {}
   ~ContentOpfParser() override;
 

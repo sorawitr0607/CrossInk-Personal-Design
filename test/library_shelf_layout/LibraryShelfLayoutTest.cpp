@@ -26,6 +26,10 @@ int main() {
   check(ThemeCount == 2 && THEME_IDS[0] == Cozy && THEME_IDS[1] == Autumn,
         "Only Cozy Nook and Autumn Harvest remain available");
   check(themeIndex(3) == 1 && themeIndex(1) == 0, "Autumn keeps its saved ID and removed themes use Cozy");
+  check(shelfGeometry(432, 550, 3, 2, true).coverWidth > 100, "3x2 Shelf books grow from the library.2 baseline");
+  check(shelfGeometry(432, 550, 2, 2, true).coverWidth < 148, "2x2 Shelf books shrink from the library.2 baseline");
+  check(geometry(446, 550, 2, 2, 8, 6, 30).coverHeight < 229,
+        "2x2 Covers books also shrink from the library.2 baseline");
   for (int i = 0; i < GRID_PRESET_COUNT; ++i) {
     const auto preset = GRID_PRESETS[i];
     check(presetIndex(preset.columns, preset.rows) == i, "grid chooser preserves saved preset");

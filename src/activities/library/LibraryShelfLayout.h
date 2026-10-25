@@ -52,7 +52,8 @@ constexpr Geometry geometry(const int width, const int height, const uint8_t col
   const int cellHeight = atLeastOne((height - (r - 1) * gap) / r);
   const int availableWidth = atLeastOne(cellWidth - 2 * inset);
   const int availableHeight = atLeastOne(cellHeight - labelHeight - 2 * inset);
-  const int coverHeight = atLeastOne(smaller(availableHeight, availableWidth * 3 / 2));
+  const int baseHeight = atLeastOne(smaller(availableHeight, availableWidth * 3 / 2));
+  const int coverHeight = c == 2 && r == 2 ? atLeastOne(baseHeight * 92 / 100) : baseHeight;
   const int coverWidth = atLeastOne(smaller(availableWidth, coverHeight * 2 / 3));
   return {c, r, cellWidth, cellHeight, coverWidth, coverHeight};
 }
@@ -61,9 +62,10 @@ constexpr Geometry shelfGeometry(const int width, const int height, const uint8_
                                  const bool ornaments) {
   const int c = columns(cols), r = rows(lines);
   const int cellHeight = atLeastOne((height - (r - 1) * 8) / r);
-  const int reserve = ornaments ? smaller(96, width / 4) : 0;
+  const int reserve = ornaments ? smaller(c == 3 && r == 2 ? 72 : 96, width / 4) : 0;
   const int availableWidth = atLeastOne((width - reserve - (c - 1) * 9 - 16) / c);
-  const int coverWidth = atLeastOne(smaller(availableWidth, atLeastOne(cellHeight - 48) * 2 / 3));
+  const int baseWidth = atLeastOne(smaller(availableWidth, atLeastOne(cellHeight - 48) * 2 / 3));
+  const int coverWidth = c == 2 && r == 2 ? atLeastOne(baseWidth * 92 / 100) : baseWidth;
   return {c, r, atLeastOne(width / c), cellHeight, coverWidth, coverWidth * 3 / 2, true, reserve};
 }
 

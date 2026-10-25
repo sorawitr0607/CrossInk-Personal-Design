@@ -42,6 +42,7 @@ namespace {
 constexpr fui::ActionId ACTION_ROW = 1;
 constexpr fui::ActionId ACTION_CONTROL = 2;
 constexpr fui::ActionId ACTION_COLLECTION = 3;
+constexpr fui::ActionId ACTION_CARD = 4;
 constexpr unsigned long LONG_PRESS_MS = 1000;
 constexpr unsigned long ACTION_FEEDBACK_MS = 1000;
 constexpr int HEADER_CONTROL_SIZE = 44;
@@ -112,6 +113,7 @@ void LibraryActivity::onEnter() {
     app.on(ACTION_ROW, &LibraryActivity::onRowEvent, this);
     app.on(ACTION_CONTROL, &LibraryActivity::onControlEvent, this);
     app.on(ACTION_COLLECTION, &LibraryActivity::onCollectionEvent, this);
+    app.on(ACTION_CARD, &LibraryActivity::onCardEvent, this);
     app.setScreen(&LibraryActivity::listScreen, this);
     // The index survives a firmware reflash, but its first boot reconciliation
     // can still take time. Show feedback whenever that scan is due.
@@ -142,6 +144,8 @@ void LibraryActivity::onEnter() {
 }
 
 void LibraryActivity::onExit() {
+  bookCardActive = false;
+  bookCard.reset();
   pendingInput.clear();
   index.close();
   filterBits.reset();
@@ -741,7 +745,7 @@ void LibraryActivity::onRowEvent(const fui::ActionEvent& event, void* user) {
   else if (alreadySelected)
     self->openBook(event.value);
   else
-    self->requestUpdate();
+    self->showBookCard(event.value);
 }
 
 void LibraryActivity::onControlEvent(const fui::ActionEvent& event, void* user) {
@@ -883,13 +887,19 @@ void LibraryActivity::loop() {
     return;
   }
   // Prepare at most one cover between input checks; repaint once per batch.
-  if (collectionsVisible)
+  if (bookCardActive)
+    loadBookCardCovers();
+  else if (collectionsVisible)
     loadCollectionPageCovers();
   else
     loadGridPageCovers();
 }
 
 void LibraryActivity::handleInput(const LibraryInputBuffer::Event& input) {
+  if (bookCardActive && bookCard) {
+    handleBookCardInput(input);
+    return;
+  }
   using Type = LibraryInputBuffer::Type;
   if (input.type == Type::TouchRelease && input.x >= 0 && input.y >= 0) {
     const auto header = TouchHeaderBackButton::headerRect(renderer, mappedInput);
@@ -1412,7 +1422,10 @@ void LibraryActivity::render(RenderLock&&) {
                             renderer.getScreenHeight() - bounds[2] - buttonHintsHeight -
                                 (FOOTER_HEIGHT + renderer.getLineHeight(library_shelf::FONT_SMALL)) / 2,
                             footer);
-  if (pendingCacheDeletedFeedback) GUI.drawPopup(renderer, tr(STR_BOOK_CACHE_DELETED));
+  if (bookCardActive)
+    drawBookCard();
+  else if (pendingCacheDeletedFeedback)
+    GUI.drawPopup(renderer, tr(STR_BOOK_CACHE_DELETED));
   renderer.displayBuffer();
 }
 

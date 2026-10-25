@@ -36,16 +36,26 @@ activity have no intentional behavior changes.
   Wallpaper reaches the screen edges behind the footer and page controls.
   Background can
   be Illustrated, Quiet or Off. Ornaments and status badges have separate toggles.
-- Tap a book to select it, then tap again to open. Long press retains the
-  original book actions. Collections open with one tap. First, previous, next
-  and last page controls appear on both collection and book pages.
+- First tap selects a book and opens its Book Card popup: cover, author, a short
+  EPUB description, series/genre tags and saved progress, with Open Book and
+  Close buttons. Missing descriptions have a plain fallback. Long press retains
+  the original book actions; after dismissing the card, a second tap on the
+  selected book opens it. The title strip can reopen its card.
+- The landing header opens the current-reading card. The info button inside a
+  collection or All Books opens a summary of that view. Cards overlay the shelf
+  without changing its layout; Back or tapping outside closes them.
+- The 3 x 2 Shelf and Covers books are slightly larger; 2 x 2 books are slightly
+  smaller. Other presets keep their existing sizing. Collections open with one
+  tap. First, previous, next and last page controls remain available.
 
 The collection cache holds compact book references using the existing
 PSRAM-aware allocator. Thumbnail work is limited to the visible page, processes
 one thumbnail between input checks, reuses exact-size disk caches, and requests
 one repaint after a cold cover batch. Cached percentages are read with the
 visible rows, so warm cover caches do not queue an extra repaint. There is no
-animation or periodic refresh. Browsing an unopened cover does not add a recent
+animation or periodic refresh. Book Card metadata is read on demand into one
+bounded record, with a 512-byte description limit and no extra framebuffer or
+reader-cache format change. Browsing an unopened cover does not add a recent
 history entry. Battery life still needs measurement on a physical reader.
 Two themes use 74,276 bytes
 of packed flash masks with no SVG parser, runtime resize, animation or extra
@@ -68,9 +78,9 @@ cppcheck, checks the shared code with a C3 build, then builds `x4-pro` and the
 native X4 Pro simulator. Simulator checks use generated books in a temporary
 card and capture actual one-bit Library output; no personal books are included.
 
-Successful runs provide the `crossink-1.6.1-library.2-x4-pro` artifact containing:
+Successful runs provide the `crossink-1.6.1-library.3-x4-pro` artifact containing:
 
-- `firmware-x4-pro-v1.6.1-library.2.bin`: the X4 Pro application image.
+- `firmware-x4-pro-v1.6.1-library.3.bin`: the X4 Pro application image.
 - `SHA256SUMS.txt` and `manifest.json`: integrity and build provenance.
 - `source.patch`: the exact patch against the pinned base, including formatting
   applied during the build.
@@ -98,7 +108,10 @@ image decoding on hardware, or battery usage.
    100% progress as a spine in Shelf view. Open one
    collection, try Title, Series, and Recently Opened sorting, and change the
    grid size, the two shelf themes, backgrounds and ornaments in Library Settings.
-6. Check Search, Refresh, file-type toggles, Back navigation, and saved settings
+6. Tap a book to inspect its card, close it with Back, then reopen it from the
+   title strip. Check Open Book, the landing current-reading header and a
+   collection's info button. Verify that the shelf stays in place under the card.
+7. Check Search, Refresh, file-type toggles, Back navigation, and saved settings
    after a restart. Confirm an unopened cover did not add a recent-history entry.
    Check an existing book's progress, bookmarks, and reading statistics.
 

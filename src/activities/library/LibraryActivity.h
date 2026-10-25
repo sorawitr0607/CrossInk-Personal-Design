@@ -8,6 +8,7 @@
 
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "LibraryInputBuffer.h"
 #include "LibraryShelfLayout.h"
@@ -23,7 +24,7 @@ class LibraryActivity final : public Activity {
   void onExit() override;
   void loop() override;
   void render(RenderLock&&) override;
-  bool blocksGlobalInput() const override { return actionPopup.isActive(); }
+  bool blocksGlobalInput() const override { return actionPopup.isActive() || bookCardActive; }
 
 #ifdef SIMULATOR
   size_t simulatorPendingInputs() const { return pendingInput.size(); }
@@ -163,6 +164,20 @@ class LibraryActivity final : public Activity {
   // SDK rowProvider consumes the strings before asking for the next row.
   // Reuse one row instead of retaining every title/author in the library.
   RecentBook rowScratch;
+  struct BookCardData {
+    RecentBook book;
+    std::string description, series, genre, seriesPosition;
+    std::vector<std::string> titleLines, descriptionLines, authors;
+    Rect dialog{}, openButton{}, closeButton{}, cover{};
+    int total = 0, finished = 0;
+    float percent = -1;
+    int coverTask = 0, previewCount = 0, pressed = 0;
+    bool summary = false, current = false, metadata = false, repaint = false;
+  };
+  // One optional card, allocated only on demand; no library-wide blurbs or
+  // background snapshot. The parent is repainted before the popup overlay.
+  std::unique_ptr<BookCardData> bookCard;
+  bool bookCardActive = false;
   std::string groupHeading;
   std::string previousGroupScratch;
   std::string groupKeyScratch;
@@ -175,6 +190,17 @@ class LibraryActivity final : public Activity {
   static void onRowEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onControlEvent(const freeink::ui::ActionEvent& event, void* user);
   static void onCollectionEvent(const freeink::ui::ActionEvent& event, void* user);
+  static void onCardEvent(const freeink::ui::ActionEvent& event, void* user);
+  void showBookCard(int row);
+  void bindBookCard(bool current);
+  void showSummaryCard();
+  void showCurrentBookCard();
+  bool allocateBookCard();
+  void prepareBookCard();
+  void drawBookCard();
+  void loadBookCardCovers();
+  void handleBookCardInput(const LibraryInputBuffer::Event& input);
+  void closeBookCard();
   static void provideRow(void* user, uint16_t row, freeink::ui::ListItem& item);
   void buildListScreen(UiApp::ScreenType& screen);
   void buildGrid(UiApp::ScreenType& screen);

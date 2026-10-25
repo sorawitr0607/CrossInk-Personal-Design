@@ -36,6 +36,7 @@ def fixture(path, number):
 <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
 <dc:identifier id="id">crossink-library-review-{number}</dc:identifier><dc:title>{escape(title)}</dc:title>
 {creator}<dc:language>en</dc:language><dc:subject>Fiction</dc:subject>
+<dc:description><![CDATA[<p>A gentle <b>garden adventure</b>, shared with friends &amp; family.</p>]]></dc:description>
 <meta name="calibre:series" content="{series}"/><meta name="calibre:series_index" content="{number // 4 + 1}"/>
 <meta name="cover" content="cover"/><meta property="dcterms:modified">2026-01-01T00:00:00Z</meta></metadata>
 <manifest><item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/>

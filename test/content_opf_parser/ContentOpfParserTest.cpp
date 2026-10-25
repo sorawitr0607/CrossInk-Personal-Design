@@ -19,6 +19,39 @@ void parse(ContentOpfParser& parser, const std::string& xml) {
 
 }  // namespace
 
+TEST(ContentOpfParserMetadata, DescriptionIsOptionalAndDoesNotDisturbOtherMetadata) {
+  const std::string xml = R"(<package xmlns:dc="http://purl.org/dc/elements/1.1/"><metadata>
+    <dc:description>A quiet adventure &amp; friendship.</dc:description>
+    <dc:title>Garden Friends</dc:title><dc:creator>Sample Author</dc:creator>
+  </metadata></package>)";
+  ContentOpfParser parser(kEmptyPath, kEmptyPath, xml.size(), nullptr);
+  parse(parser, xml);
+  EXPECT_EQ(parser.title, "Garden Friends");
+  EXPECT_EQ(parser.author, "Sample Author");
+}
+
+TEST(ContentOpfParserMetadata, CollectsOnlyFirstDescriptionWhenRequested) {
+  const std::string xml = R"(<package xmlns:dc="http://purl.org/dc/elements/1.1/"><metadata>
+    <dc:description><![CDATA[<p>A quiet <b>garden</b> &amp; friends.</p>]]></dc:description>
+    <dc:description>Second description</dc:description><dc:title>Garden Friends</dc:title>
+  </metadata></package>)";
+  std::string description;
+  ContentOpfParser parser(kEmptyPath, kEmptyPath, xml.size(), nullptr, false, false, &description);
+  parse(parser, xml);
+  EXPECT_EQ(description, "<p>A quiet <b>garden</b> &amp; friends.</p>");
+  EXPECT_EQ(parser.title, "Garden Friends");
+}
+
+TEST(ContentOpfParserMetadata, DescriptionCapPreservesUtf8AcrossCallbacks) {
+  const std::string prefix(511, 'A');
+  const std::string xml = "<package xmlns:dc=\"http://purl.org/dc/elements/1.1/\"><metadata><dc:description>" + prefix +
+                          "\xC3\xA9&amp;tail</dc:description></metadata></package>";
+  std::string description;
+  ContentOpfParser parser(kEmptyPath, kEmptyPath, xml.size(), nullptr, false, false, &description);
+  parse(parser, xml);
+  EXPECT_EQ(description, prefix);
+}
+
 TEST(ContentOpfParserMetadata, EntityCallbackDoesNotSplitOneAuthor) {
   const std::string xml =
       R"(<package xmlns:dc="http://purl.org/dc/elements/1.1/"><metadata><dc:creator>&#201;mile Zola</dc:creator></metadata></package>)";

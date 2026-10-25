@@ -2,6 +2,7 @@
 
 ### Added
 
+- Open an on-demand Book Card popup with the real EPUB description, cover, author, tags and saved progress; access current-reading and collection-summary cards without reducing shelf space.
 - Open Library to Series, Authors, and SD Folder collections with stacked cover thumbnails and an All Books shortcut.
 - Choose a Library-only book grid from 2 x 2 to 4 x 4, plus Shelf, Covers and List views for every sort.
 - Use Cozy Nook and Autumn Harvest with the v6 illustrations, full-screen wallpaper, ornaments and status badges.
@@ -15,6 +16,7 @@
 
 ### Changed
 
+- Enlarge 3 x 2 Shelf/Covers books slightly and reduce 2 x 2 books slightly; preserve the other grid presets.
 - Use the book grid with every Library sort, defaulting to Series when opening a collection.
 - Keep Library Search, manual Refresh, Settings, Display, and Show Files controls; retain collection scope when sorting.
 - Prepare visible cover thumbnails one at a time and batch the resulting repaint. Browsing covers does not mark books as opened.

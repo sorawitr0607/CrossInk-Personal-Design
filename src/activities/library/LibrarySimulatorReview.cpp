@@ -112,7 +112,9 @@ void LibraryActivity::runSimulatorLibraryReview() {
   const auto settle = [&] {
     paint();
     for (int i = 0; i < 72; ++i) {
-      if (collectionsVisible)
+      if (bookCardActive)
+        loadBookCardCovers();
+      else if (collectionsVisible)
         loadCollectionPageCovers();
       else
         loadGridPageCovers();
@@ -178,6 +180,23 @@ void LibraryActivity::runSimulatorLibraryReview() {
         check(showSelection && selection == cell.row + CONTROL_COUNT && index.isOpen(),
               "First touch selects the book without opening it");
         capture("book-selected");
+        check(bookCardActive && bookCard && !bookCard->summary, "First book tap opens its detail popup");
+        check(bookCard->description.find("garden adventure") != std::string::npos &&
+                  bookCard->description.find("& family") != std::string::npos &&
+                  bookCard->description.find('<') == std::string::npos,
+              "Book popup uses the real plain-text EPUB blurb");
+        check(!bookCard->book.author.empty() && bookCard->series.find('#') != std::string::npos &&
+                  bookCard->genre == "Fiction" && bookCard->percent == 100,
+              "Book popup binds author, series position, genre and saved progress");
+        check(bookCells[0].x == cell.x && bookCells[0].y == cell.y && bookCells[0].height == cell.height,
+              "Popup does not squeeze or reposition the shelf");
+        const auto close = bookCard->closeButton;
+        handleInput({LibraryInputBuffer::Type::TouchPress, static_cast<int16_t>(close.x + close.width / 2),
+                     static_cast<int16_t>(close.y + close.height / 2)});
+        handleInput({LibraryInputBuffer::Type::TouchRelease, static_cast<int16_t>(close.x + close.width / 2),
+                     static_cast<int16_t>(close.y + close.height / 2)});
+        check(!bookCardActive && index.isOpen(), "Closing a card retains the Library and selection");
+        paint();
       }
       check(bookPageCount > 1, "Fixture exercises multiple book pages");
       moveBookPage(2);
@@ -188,6 +207,17 @@ void LibraryActivity::runSimulatorLibraryReview() {
       moveBookPage(-2);
       paint();
       check(bookPageIndex == 0, "First page");
+      if (view == library_shelf::Shelf) {
+        SETTINGS.libraryGridColumns = 2;
+        SETTINGS.libraryGridRows = 2;
+        resetViewport();
+        snprintf(name, sizeof(name), "theme-%u-shelf-2x2", theme);
+        capture(name);
+        std::printf("LIBRARY SIZE REVIEW: theme %u 2x2 %dx%d\n", theme, gridCoverWidth, gridCoverHeight);
+        SETTINGS.libraryGridColumns = 3;
+        resetViewport();
+        std::printf("LIBRARY SIZE REVIEW: theme %u 3x2 follows in default capture\n", theme);
+      }
       for (const auto preset : library_shelf::GRID_PRESETS) {
         SETTINGS.libraryGridColumns = preset.columns;
         SETTINGS.libraryGridRows = preset.rows;
@@ -207,6 +237,26 @@ void LibraryActivity::runSimulatorLibraryReview() {
   SETTINGS.libraryBookshelfTheme = library_shelf::Cozy;
   SETTINGS.libraryGridColumns = 3;
   SETTINGS.libraryGridRows = 2;
+  check(readIndexedBook(4, rowScratch), "Read current-book fixture");
+  const auto currentPath = rowScratch.path;
+  RECENT_BOOKS.addOrUpdateBook(rowScratch.path, rowScratch.title, rowScratch.author, "");
+  enterCollections(CollectionKind::Series);
+  paint();
+  handleInput({LibraryInputBuffer::Type::TouchPress, 32, 136});
+  handleInput({LibraryInputBuffer::Type::TouchRelease, 32, 136});
+  check(bookCardActive && bookCard->current && bookCard->book.path == currentPath,
+        "Library Continue Reading opens the actual most recent book card");
+  capture("card-current-reading");
+  handleInput({LibraryInputBuffer::Type::BackRelease});
+  check(!bookCardActive && collectionsVisible, "Back closes the current-book popup without leaving Library");
+  RECENT_BOOKS.removeByPath(currentPath);
+  enterCollection(0);
+  showSummaryCard();
+  check(bookCardActive && bookCard->summary && bookCard->total == rowCount() && bookCard->finished > 0 &&
+            bookCard->finished < bookCard->total,
+        "Collection card summarizes its own filtered books and completion");
+  capture("card-collection-summary");
+  closeBookCard();
   enterCollections(CollectionKind::Authors);
   capture("authors");
   check(collectionCount >= 2, "Authors tab");

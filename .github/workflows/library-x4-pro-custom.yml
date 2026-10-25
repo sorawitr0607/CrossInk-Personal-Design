@@ -19,7 +19,7 @@ jobs:
     env:
       CROSSINK_LIBRARY_BASE: 9914146eeae7b46b300f475a16c32426fc02ec1f
       CROSSINK_LIBRARY_SDK: 699370183fa3a0e33c9cb83a36f701bbb6022095
-      CROSSINK_RELEASE_VERSION: 1.6.1-library.2
+      CROSSINK_RELEASE_VERSION: 1.6.1-library.3
     steps:
       - uses: actions/checkout@v6
         with:
@@ -118,7 +118,7 @@ jobs:
       - name: Upload firmware and source provenance
         uses: actions/upload-artifact@v7
         with:
-          name: crossink-1.6.1-library.2-x4-pro
+          name: crossink-1.6.1-library.3-x4-pro
           path: artifacts/
           if-no-files-found: error
           retention-days: 30

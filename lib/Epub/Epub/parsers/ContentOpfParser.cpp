@@ -352,6 +352,13 @@ void XMLCALL ContentOpfParser::startElement(void* userData, const XML_Char* name
     return;
   }
 
+  if (self->state == IN_METADATA && isDcElement(name, "description") && self->description &&
+      self->description->empty()) {
+    self->state = IN_BOOK_DESCRIPTION;
+    self->metadataSpacePending = false;
+    return;
+  }
+
   if (self->state == IN_PACKAGE && isOpfElement(name, "manifest")) {
     self->state = IN_MANIFEST;
     if (!Storage.openFileForWrite("COF", self->cachePath + itemCacheFile, self->tempItemStore)) {
@@ -607,6 +614,10 @@ void XMLCALL ContentOpfParser::characterData(void* userData, const XML_Char* s, 
     appendMetadataText(self->subject, s, len, self->metadataSpacePending, self->subjectTruncated);
     return;
   }
+  if (self->state == IN_BOOK_DESCRIPTION && self->description) {
+    appendMetadataText(*self->description, s, len, self->metadataSpacePending, self->descriptionTruncated);
+    return;
+  }
   if (self->state == IN_BOOK_COLLECTION) {
     appendMetadataText(self->collectionName, s, len, self->metadataSpacePending, self->seriesTruncated);
     return;
@@ -662,6 +673,10 @@ void XMLCALL ContentOpfParser::endElement(void* userData, const XML_Char* name) 
     return;
   }
   if (self->state == IN_BOOK_SUBJECT && isDcElement(name, "subject")) {
+    self->state = IN_METADATA;
+    return;
+  }
+  if (self->state == IN_BOOK_DESCRIPTION && isDcElement(name, "description")) {
     self->state = IN_METADATA;
     return;
   }

@@ -105,7 +105,7 @@ void LibraryActivity::ensureBookPages(const int width, const int height) {
   const bool dense = library_shelf::rows(SETTINGS.libraryGridRows) >= 3;
   const int labelHeight = shelf ? 0 : dense ? 22 : 44;
   const int plankSpace = shelf ? 24 : dense ? 22 : 30;
-  const int headroom = dense ? 0 : 18;
+  const int headroom = dense ? 0 : SETTINGS.libraryGridColumns == 3 ? 4 : 18;
   const auto geometry =
       shelf ? library_shelf::shelfGeometry(width, height, SETTINGS.libraryGridColumns, SETTINGS.libraryGridRows,
                                            SETTINGS.libraryOrnaments)
@@ -277,11 +277,20 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
   if (showSelection && selection >= CONTROL_COUNT && readBook(selection - CONTROL_COUNT, rowScratch))
     captionText = rowScratch.title.c_str();
   renderer.fillRect(caption.x + 8, caption.y, caption.width - 16, caption.height, false);
-  drawBookLabel(captionText, library_shelf::FONT_SMALL, caption.x + 12, caption.y + 2, caption.width - 24);
+  drawBookLabel(captionText, library_shelf::FONT_SMALL, caption.x + 12, caption.y + 2, caption.width - 68);
+  const fui::Rect info{static_cast<int16_t>(caption.right() - 44), caption.y, 44, caption.height};
+  renderer.fillRect(info.x, info.y, info.width, info.height, false);
+  renderer.drawRect(info.x + 13, info.y + 3, 18, 18);
+  renderer.drawText(library_shelf::FONT_SMALL, info.x + 20, info.y + 4, "i");
+  screen.frame().hit(info, 4, -2, fui::InputTouch);
+  const fui::Rect details{caption.x, caption.y, static_cast<int16_t>(caption.width - 44), caption.height};
+  screen.frame().hit(details, 4,
+                     static_cast<int16_t>(showSelection && selection >= CONTROL_COUNT ? selection - CONTROL_COUNT : -2),
+                     fui::InputTouch);
   const bool dense = library_shelf::rows(SETTINGS.libraryGridRows) >= 3;
   const int labelHeight = shelf ? 0 : dense ? 22 : 44;
   const int plankSpace = shelf ? 24 : dense ? 22 : 30;
-  const int headroom = dense ? 0 : 18;
+  const int headroom = dense ? 0 : SETTINGS.libraryGridColumns == 3 ? 4 : 18;
   const auto geometry =
       shelf ? library_shelf::shelfGeometry(area.width, area.height, SETTINGS.libraryGridColumns,
                                            SETTINGS.libraryGridRows, SETTINGS.libraryOrnaments)

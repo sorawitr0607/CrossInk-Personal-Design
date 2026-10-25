@@ -12,7 +12,7 @@ import subprocess
 ROOT = Path(__file__).resolve().parents[1]
 BASE = "9914146eeae7b46b300f475a16c32426fc02ec1f"
 SDK = "699370183fa3a0e33c9cb83a36f701bbb6022095"
-NAME = "firmware-x4-pro-v1.6.1-library.2.bin"
+NAME = "firmware-x4-pro-v1.6.1-library.3.bin"
 
 
 def git(*args: str) -> str:
@@ -40,7 +40,7 @@ def main() -> None:
         "device": "Xteink X4 Pro",
         "platformio_environment": "x4-pro",
         "base_version": "CrossInk 1.6.1",
-        "custom_version": "1.6.1-library.2-x4-pro",
+        "custom_version": "1.6.1-library.3-x4-pro",
         "base_commit": BASE,
         "sdk_commit": SDK,
         "source_commit": git("rev-parse", "HEAD"),

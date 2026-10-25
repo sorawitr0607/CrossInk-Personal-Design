@@ -99,7 +99,8 @@ class Epub {
 
   bool findContentOpfFile(std::string* contentOpfFile) const;
   bool parseContentOpf(BookMetadataCache::BookMetadata& bookMetadata, bool writeSpineEntries = true,
-                       bool collectCssFiles = true, bool metadataOnly = false, std::string* seriesIndex = nullptr);
+                       bool collectCssFiles = true, bool metadataOnly = false, std::string* seriesIndex = nullptr,
+                       std::string* description = nullptr);
   bool parseTocNcxFile() const;
   bool parseTocNavFile() const;
   CssParseStatus parseCssFiles(bool forceRebuild = false) const;
@@ -133,7 +134,8 @@ class Epub {
   // Library index builder, which reads every EPUB on the card and cannot
   // afford a full load() per book.
   bool loadMetadata(std::string& title, std::string& author, bool allowCachedMetadata = true,
-                    std::string* series = nullptr, std::string* genre = nullptr, std::string* seriesIndex = nullptr);
+                    std::string* series = nullptr, std::string* genre = nullptr, std::string* seriesIndex = nullptr,
+                    std::string* description = nullptr);
   // Loads optional stable-page and source-spine metadata after a Skip-mode open.
   // Failure leaves normal size-based progress available.
   bool loadXLocations();

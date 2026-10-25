@@ -317,6 +317,7 @@ void LibraryActivity::handleCollectionInput(const LibraryInputBuffer::Event& inp
 
 void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
   const auto heroBand = screen.take(fui::LayoutAnchor::Top, 80, 0);
+  screen.frame().hit(heroBand, 4, -1, fui::InputTouch);
   static constexpr StrId themeLabels[] = {StrId::STR_LIBRARY_SHELF_COZY, StrId::STR_LIBRARY_SHELF_AUTUMN};
   static constexpr StrId headlines[] = {StrId::STR_LIBRARY_WELCOME, StrId::STR_LIBRARY_WELCOME_AUTUMN};
   static constexpr StrId taglines[] = {StrId::STR_LIBRARY_TAGLINE_COZY, StrId::STR_LIBRARY_TAGLINE_AUTUMN};
@@ -329,8 +330,8 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
                 heroBand.width - heroWidth - 28);
   drawBookLabel(I18N.get(headlines[themeChoice]), library_shelf::FONT_HEADING, heroBand.x + 16, heroBand.y + 24,
                 heroBand.width - heroWidth - 28);
-  drawBookLabel(I18N.get(taglines[themeChoice]), library_shelf::FONT_SMALL, heroBand.x + 16, heroBand.y + 56,
-                heroBand.width - heroWidth - 28);
+  drawBookLabel(RECENT_BOOKS.getCount() > 0 ? tr(STR_CONTINUE_READING) : I18N.get(taglines[themeChoice]),
+                library_shelf::FONT_SMALL, heroBand.x + 16, heroBand.y + 56, heroBand.width - heroWidth - 28);
   if (SETTINGS.libraryOrnaments)
     library_shelf::drawSprite(renderer, *art.hero, heroBand.right() - art.hero->width - 12,
                               heroBand.bottom() - art.hero->height - 2);

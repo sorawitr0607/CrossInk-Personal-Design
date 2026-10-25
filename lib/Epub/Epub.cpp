@@ -552,7 +552,8 @@ bool Epub::findContentOpfFile(std::string* contentOpfFile) const {
 }
 
 bool Epub::parseContentOpf(BookMetadataCache::BookMetadata& bookMetadata, const bool writeSpineEntries,
-                           const bool collectCssFiles, const bool metadataOnly, std::string* seriesIndex) {
+                           const bool collectCssFiles, const bool metadataOnly, std::string* seriesIndex,
+                           std::string* description) {
   std::string contentOpfFilePath;
   if (!findContentOpfFile(&contentOpfFilePath)) {
     LOG_ERR("EBP", "Could not find content.opf in zip");
@@ -568,7 +569,8 @@ bool Epub::parseContentOpf(BookMetadataCache::BookMetadata& bookMetadata, const 
   }
 
   ContentOpfParser opfParser(getCachePath(), getBasePath(), contentOpfSize,
-                             writeSpineEntries ? bookMetadataCache.get() : nullptr, collectCssFiles, metadataOnly);
+                             writeSpineEntries ? bookMetadataCache.get() : nullptr, collectCssFiles, metadataOnly,
+                             description);
   if (!opfParser.setup()) {
     LOG_ERR("EBP", "Could not setup content.opf parser");
     if (opfParser.failedForLowMemory()) {
@@ -1115,18 +1117,19 @@ bool Epub::load(const bool buildIfMissing, const bool skipLoadingCss, const XLoc
 }
 
 bool Epub::loadMetadata(std::string& title, std::string& author, const bool allowCachedMetadata, std::string* series,
-                        std::string* genre, std::string* seriesIndex) {
+                        std::string* genre, std::string* seriesIndex, std::string* description) {
   title.clear();
   author.clear();
   if (series) series->clear();
   if (genre) genre->clear();
   if (seriesIndex) seriesIndex->clear();
+  if (description) description->clear();
 
   // The reader cache holds title and author but not the Library's series and
   // genre fields. Reuse it for callers that need only title/author; the Library
   // parses OPF metadata once and then keeps the extra fields in its own index.
   // This LOCAL reader does not alter the full load()/spine cache lifecycle.
-  if (allowCachedMetadata && !series && !genre && !seriesIndex) {
+  if (allowCachedMetadata && !series && !genre && !seriesIndex && !description) {
     auto metadataCache = makeUniqueNoThrow<BookMetadataCache>(cachePath);
     if (metadataCache && metadataCache->load()) {
       title = metadataCache->coreMetadata.title;
@@ -1140,7 +1143,7 @@ bool Epub::loadMetadata(std::string& title, std::string& author, const bool allo
 
   BookMetadataCache::BookMetadata metadata;
   const bool loaded = parseContentOpf(metadata, /*writeSpineEntries=*/false, /*collectCssFiles=*/false,
-                                      /*metadataOnly=*/true, seriesIndex);
+                                      /*metadataOnly=*/true, seriesIndex, description);
   if (!loaded) return false;
 
   title = std::move(metadata.title);
