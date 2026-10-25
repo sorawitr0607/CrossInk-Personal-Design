@@ -250,7 +250,13 @@ void LibraryActivity::runSimulatorLibraryReview() {
   handleInput({LibraryInputBuffer::Type::BackRelease});
   check(!bookCardActive && collectionsVisible, "Back closes the current-book popup without leaving Library");
   RECENT_BOOKS.removeByPath(currentPath);
+  showCurrentBookCard();
+  check(bookCardActive && bookCard->summary && bookCard->total == rowCount() && bookCard->finished == allCompleted,
+        "Without recent reading, the header reuses the landing Library totals");
+  closeBookCard();
   enterCollection(0);
+  paint();
+  check(pageCacheValid && !pageCacheFallback && rowCompletion, "Summary reuses the shelf completion cache");
   showSummaryCard();
   check(bookCardActive && bookCard->summary && bookCard->total == rowCount() && bookCard->finished > 0 &&
             bookCard->finished < bookCard->total,
