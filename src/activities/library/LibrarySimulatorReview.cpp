@@ -185,6 +185,9 @@ void LibraryActivity::runSimulatorLibraryReview() {
                   bookCard->description.find("& family") != std::string::npos &&
                   bookCard->description.find('<') == std::string::npos,
               "Book popup uses the real plain-text EPUB blurb");
+        check(bookCard->description.find(
+                  "family. First paragraph. Second paragraph. Quiet friendship. A cozy ending.") != std::string::npos,
+              "Description keeps paragraph/break spacing while preserving inline word fragments");
         check(!bookCard->book.author.empty() && bookCard->series.find('#') != std::string::npos &&
                   bookCard->genre == "Fiction" && bookCard->percent == 100,
               "Book popup binds author, series position, genre and saved progress");
@@ -196,6 +199,20 @@ void LibraryActivity::runSimulatorLibraryReview() {
         handleInput({LibraryInputBuffer::Type::TouchRelease, static_cast<int16_t>(close.x + close.width / 2),
                      static_cast<int16_t>(close.y + close.height / 2)});
         check(!bookCardActive && index.isOpen(), "Closing a card retains the Library and selection");
+        paint();
+        handleInput({LibraryInputBuffer::Type::TouchPress, x, y});
+        handleInput({LibraryInputBuffer::Type::TouchRelease, x, y});
+        check(bookCardActive && index.isOpen(), "Tapping the selected book consistently opens its card again");
+        closeBookCard();
+        bookCard->description = "Stale cached description";
+        refreshLibrary();
+        check(bookCard->book.path.empty(), "Refresh invalidates the cached card without reallocating it");
+        paint();
+        showBookCard(0);
+        check(bookCardActive && bookCard->description.find("garden adventure") != std::string::npos &&
+                  bookCard->description.find("Stale") == std::string::npos,
+              "Reopening after Refresh reloads the EPUB description at the same path");
+        closeBookCard();
         paint();
       }
       check(bookPageCount > 1, "Fixture exercises multiple book pages");
@@ -309,6 +326,23 @@ void LibraryActivity::runSimulatorLibraryReview() {
   settings->onEnter();
   settings->render(std::move(reviewLock));
   saveImage("settings-display");
+  check(settings->simulatorHasSetting(StrId::STR_LIBRARY_GRID_SIZE) &&
+            !settings->simulatorHasSetting(StrId::STR_LIBRARY_LIST_DENSITY),
+        "Shelf settings show grid size and hide List density");
+  check(settings->simulatorHasSetting(StrId::STR_LIBRARY_SHOW_SERIES_TAGS) &&
+            settings->simulatorHasSetting(StrId::STR_LIBRARY_SHOW_GENRE_TAGS),
+        "Metadata display controls have explicit tag labels");
+  SETTINGS.libraryBookView = library_shelf::List;
+  settings->render(std::move(reviewLock));
+  saveImage("settings-list-density");
+  check(!settings->simulatorHasSetting(StrId::STR_LIBRARY_GRID_SIZE) &&
+            settings->simulatorHasSetting(StrId::STR_LIBRARY_LIST_DENSITY),
+        "List settings show List density and hide grid size");
+  SETTINGS.libraryBookView = library_shelf::Covers;
+  check(settings->simulatorHasSetting(StrId::STR_LIBRARY_GRID_SIZE) &&
+            !settings->simulatorHasSetting(StrId::STR_LIBRARY_LIST_DENSITY),
+        "Covers settings show grid size and hide List density");
+  SETTINGS.libraryBookView = library_shelf::Shelf;
   settings->simulatorShowFiles();
   settings->render(std::move(reviewLock));
   saveImage("settings-files");
@@ -337,6 +371,14 @@ void LibraryActivity::runSimulatorLibraryReview() {
   SETTINGS.fromJson(saved.as<JsonVariantConst>());
   check(SETTINGS.libraryBookshelfTheme == library_shelf::Cozy, "Removed themes fall back to Cozy Nook");
   check(RECENT_BOOKS.getCount() == recentCountBefore, "Unopened covers never enter recent history");
+  showBookCard(0);
+  check(bookCardActive, "Open the final Read this book action fixture");
+  const auto read = bookCard->openButton;
+  handleInput({LibraryInputBuffer::Type::TouchPress, static_cast<int16_t>(read.x + read.width / 2),
+               static_cast<int16_t>(read.y + read.height / 2)});
+  handleInput({LibraryInputBuffer::Type::TouchRelease, static_cast<int16_t>(read.x + read.width / 2),
+               static_cast<int16_t>(read.y + read.height / 2)});
+  check(!bookCardActive && !index.isOpen(), "Read this book dismisses the card and hands off to the reader");
   std::printf("LIBRARY REVIEW PASS: %u checks, %u native captures\n", checks, captures);
   std::fflush(stdout);
   std::_Exit(0);

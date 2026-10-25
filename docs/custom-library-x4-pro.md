@@ -20,6 +20,9 @@ activity have no intentional behavior changes.
   Recently Opened contains books already in the existing recent history.
 - Refresh, Search, Settings, Display, and Show Files remain available.
 - Book view, grid dimensions, and shelf theme are Library-specific settings.
+  Grid size appears in Shelf and Covers; List density appears in List. Show
+  series tags and Show genre tags control metadata labels. Theme, background
+  and ornament controls remain available because they also affect collections.
   Grid dimensions mean columns by rows, defaulting to 3 by 2.
 - Shelf, Covers and List work with every sort. Shelf mixes tightly grouped
   finished-book spines, face-out covers and ornaments on shared wooden planks,
@@ -37,13 +40,16 @@ activity have no intentional behavior changes.
   Background can
   be Illustrated, Quiet or Off. Ornaments and status badges have separate toggles.
 - First tap selects a book and opens its Book Card popup: cover, author, a short
-  EPUB description, series/genre tags and saved progress, with Open Book and
+  EPUB description, series/genre tags and saved progress, with Read this book and
   Close buttons. Missing descriptions have a plain fallback. Long press retains
-  the original book actions; after dismissing the card, a second tap on the
-  selected book opens it. The title strip can reopen its card.
+  the original book actions. Every short book tap opens its card, including an
+  already-selected book. Read this book (or the cover inside the card) opens the
+  reader. The title strip can reopen the selected card.
 - The landing header opens the current-reading card. The info button inside a
   collection or All Books opens a summary of that view. Cards overlay the shelf
-  without changing its layout; Back or tapping outside closes them.
+  without changing its layout; Back or tapping outside closes them. Refresh
+  invalidates the cached card so replacing an EPUB at the same path reloads its
+  metadata. Paragraphs and line breaks retain word spacing in descriptions.
 - The 3 x 2 Shelf and Covers books are slightly larger; 2 x 2 books are slightly
   smaller. Other presets keep their existing sizing. Collections open with one
   tap. First, previous, next and last page controls remain available.
@@ -78,9 +84,9 @@ cppcheck, checks the shared code with a C3 build, then builds `x4-pro` and the
 native X4 Pro simulator. Simulator checks use generated books in a temporary
 card and capture actual one-bit Library output; no personal books are included.
 
-Successful runs provide the `crossink-1.6.1-library.3-x4-pro` artifact containing:
+Successful runs provide the `crossink-1.6.1-library.4-x4-pro` artifact containing:
 
-- `firmware-x4-pro-v1.6.1-library.3.bin`: the X4 Pro application image.
+- `firmware-x4-pro-v1.6.1-library.4.bin`: the X4 Pro application image.
 - `SHA256SUMS.txt` and `manifest.json`: integrity and build provenance.
 - `source.patch`: the exact patch against the pinned base, including formatting
   applied during the build.
@@ -109,7 +115,7 @@ image decoding on hardware, or battery usage.
    collection, try Title, Series, and Recently Opened sorting, and change the
    grid size, the two shelf themes, backgrounds and ornaments in Library Settings.
 6. Tap a book to inspect its card, close it with Back, then reopen it from the
-   title strip. Check Open Book, the landing current-reading header and a
+   title strip. Check Read this book, the landing current-reading header and a
    collection's info button. Verify that the shelf stays in place under the card.
 7. Check Search, Refresh, file-type toggles, Back navigation, and saved settings
    after a restart. Confirm an unopened cover did not add a recent-history entry.

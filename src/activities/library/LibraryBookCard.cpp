@@ -6,8 +6,10 @@
 #include <Memory.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <string_view>
 
 #include "LibraryActivity.h"
 #include "LibraryFonts.h"
@@ -15,6 +17,18 @@
 
 namespace {
 constexpr int COVER_W = 112, COVER_H = 168;
+
+bool isBlockTag(const std::string_view tag) {
+  static constexpr std::string_view blocks[] = {"p",          "br",      "div",     "li", "ul",  "ol",
+                                                "blockquote", "section", "article", "hr", "pre", "h1",
+                                                "h2",         "h3",      "h4",      "h5", "h6"};
+  for (const auto block : blocks)
+    if (tag.size() == block.size() && std::equal(tag.begin(), tag.end(), block.begin(), [](const char a, const char b) {
+          return std::tolower(static_cast<unsigned char>(a)) == b;
+        }))
+      return true;
+  return false;
+}
 
 void plainBlurb(std::string& text) {
   for (size_t position = 0; position < text.size(); ++position) {
@@ -27,8 +41,14 @@ void plainBlurb(std::string& text) {
   }
   size_t output = 0;
   bool tag = false, space = false;
-  for (const char character : text) {
+  for (size_t position = 0; position < text.size(); ++position) {
+    const char character = text[position];
     if (character == '<') {
+      const size_t start = position + 1 + (position + 1 < text.size() && text[position + 1] == '/' ? 1 : 0);
+      const auto end = text.find_first_of(" \t\n\r/>", start);
+      // Paragraphs and breaks separate words; inline markup must preserve
+      // fragments such as <i>friend</i>ship and punctuation around emphasis.
+      if (end != std::string::npos && isBlockTag(std::string_view(text.data() + start, end - start))) space = true;
       tag = true;
       continue;
     }

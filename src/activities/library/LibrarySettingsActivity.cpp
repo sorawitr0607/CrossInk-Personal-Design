@@ -2,6 +2,8 @@
 
 #include <I18n.h>
 
+#include <string_view>
+
 #include "LibraryShelfLayout.h"
 #include "components/TouchHeaderBackButton.h"
 #include "components/UITheme.h"
@@ -11,8 +13,18 @@ namespace fui = freeink::ui;
 
 namespace {
 constexpr fui::ActionId ACTION_ROW = 1;
-constexpr int ROW_COUNT = 15;
-constexpr uint8_t ROW_ORDER[ROW_COUNT] = {0, 3, 4, 5, 2, 10, 11, 12, 13, 14, 1, 6, 7, 8, 9};
+constexpr int ROW_COUNT = 14;
+constexpr uint8_t ROW_ORDER[] = {0, 3, 4, 5, 2, 10, 11, 12, 13, 14, 1, 6, 7, 8, 9};
+// Exactly one control is irrelevant in each view. Keep the mapping shared by
+// drawing and activation so hiding a row cannot change what its tap controls.
+int logicalRow(int row) {
+  const int hidden = SETTINGS.libraryBookView == library_shelf::List ? 10 : 1;
+  for (const auto logical : ROW_ORDER) {
+    if (logical == hidden) continue;
+    if (row-- == 0) return logical;
+  }
+  return -1;
+}
 constexpr StrId GRID_LABELS[] = {StrId::STR_LIBRARY_GRID_2_2, StrId::STR_LIBRARY_GRID_3_2, StrId::STR_LIBRARY_GRID_2_3,
                                  StrId::STR_LIBRARY_GRID_3_3, StrId::STR_LIBRARY_GRID_4_2, StrId::STR_LIBRARY_GRID_2_4,
                                  StrId::STR_LIBRARY_GRID_4_3, StrId::STR_LIBRARY_GRID_3_4, StrId::STR_LIBRARY_GRID_4_4};
@@ -39,7 +51,7 @@ void LibrarySettingsActivity::onEnter() {
 
 void LibrarySettingsActivity::toggle(const int row) {
   if (row < 0 || row >= ROW_COUNT) return;
-  switch (ROW_ORDER[row]) {
+  switch (logicalRow(row)) {
     case 0:
       SETTINGS.libraryUseMetadata = !SETTINGS.libraryUseMetadata;
       break;
@@ -98,6 +110,7 @@ void LibrarySettingsActivity::chooseBookView() {
                      if (selected < 0 || selected >= library_shelf::ViewCount) return;
                      SETTINGS.libraryBookView = static_cast<uint8_t>(selected);
                      if (!SETTINGS.saveToFile()) LOG_ERR("LIB", "Cannot save Library view");
+                     uiReady = false;
                      requestUpdate();
                    });
   requestUpdate();
@@ -234,12 +247,13 @@ void LibrarySettingsActivity::screen(UiApp::ScreenType& screen, void* user) {
 
 void LibrarySettingsActivity::provideRow(void*, const uint16_t row, fui::ListItem& item) {
   static constexpr StrId labels[] = {
-      StrId::STR_LIBRARY_USE_METADATA,   StrId::STR_LIBRARY_LIST_VIEW, StrId::STR_LIBRARY_BOOK_VIEW,
-      StrId::STR_LIBRARY_FINISHED_BOOKS, StrId::STR_LIBRARY_SERIES,    StrId::STR_LIBRARY_GENRE,
-      StrId::STR_LIBRARY_EPUBS,          StrId::STR_LIBRARY_XTC_XTCH,  StrId::STR_LIBRARY_TXT,
-      StrId::STR_LIBRARY_MARKDOWN,       StrId::STR_LIBRARY_GRID_SIZE, StrId::STR_LIBRARY_SHELF_THEME,
-      StrId::STR_LIBRARY_BACKGROUND,     StrId::STR_LIBRARY_ORNAMENTS, StrId::STR_LIBRARY_STATUS_BADGES};
-  const uint8_t logical = ROW_ORDER[row];
+      StrId::STR_LIBRARY_USE_METADATA,   StrId::STR_LIBRARY_LIST_DENSITY,     StrId::STR_LIBRARY_BOOK_VIEW,
+      StrId::STR_LIBRARY_FINISHED_BOOKS, StrId::STR_LIBRARY_SHOW_SERIES_TAGS, StrId::STR_LIBRARY_SHOW_GENRE_TAGS,
+      StrId::STR_LIBRARY_EPUBS,          StrId::STR_LIBRARY_XTC_XTCH,         StrId::STR_LIBRARY_TXT,
+      StrId::STR_LIBRARY_MARKDOWN,       StrId::STR_LIBRARY_GRID_SIZE,        StrId::STR_LIBRARY_SHELF_THEME,
+      StrId::STR_LIBRARY_BACKGROUND,     StrId::STR_LIBRARY_ORNAMENTS,        StrId::STR_LIBRARY_STATUS_BADGES};
+  const int logical = logicalRow(row);
+  if (logical < 0) return;
   item.label = I18N.get(labels[logical]);
   item.actionValue = static_cast<int16_t>(row);
   if (logical == 1) {
@@ -303,6 +317,17 @@ void LibrarySettingsActivity::provideRow(void*, const uint16_t row, fui::ListIte
       break;
   }
 }
+
+#ifdef SIMULATOR
+bool LibrarySettingsActivity::simulatorHasSetting(const StrId key) const {
+  for (int row = 0; row < ROW_COUNT; ++row) {
+    fui::ListItem item{};
+    provideRow(nullptr, row, item);
+    if (item.label && std::string_view(item.label) == I18N.get(key)) return true;
+  }
+  return false;
+}
+#endif
 
 void LibrarySettingsActivity::buildScreen(UiApp::ScreenType& screen) {
   const auto& metrics = UITheme::getInstance().getMetrics();

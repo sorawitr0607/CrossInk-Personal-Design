@@ -9,6 +9,8 @@
 
 ### Fixed
 
+- Invalidate Book Card metadata on Refresh, including EPUB replacements at the same path.
+- Preserve word spacing between description paragraphs and line breaks without splitting inline words.
 - Render books at displayed 100% progress as spines even without a manual Finished flag; use the same completion rule for counts and Hide Finished.
 - Keep Authors populated when a book has no author metadata, with an Unknown Author collection for those books.
 - Exclude the generated root My Clippings.txt export from Library books while retaining ordinary TXT books and the Clippings feature.
@@ -16,6 +18,8 @@
 
 ### Changed
 
+- Make every short book tap open its card consistently, with an explicit Read this book action.
+- Clarify Show series tags, Show genre tags and List density labels; show grid size or list density only in the applicable book view.
 - Enlarge 3 x 2 Shelf/Covers books slightly and reduce 2 x 2 books slightly; preserve the other grid presets.
 - Use the book grid with every Library sort, defaulting to Series when opening a collection.
 - Keep Library Search, manual Refresh, Settings, Display, and Show Files controls; retain collection scope when sorting.

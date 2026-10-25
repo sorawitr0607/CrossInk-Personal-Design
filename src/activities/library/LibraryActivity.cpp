@@ -688,6 +688,9 @@ void LibraryActivity::openSearch() {
 }
 
 void LibraryActivity::refreshLibrary() {
+  // Reuse the allocated card storage, but force metadata to be read again even
+  // when an EPUB was replaced at the same path.
+  if (bookCard) bookCard->book.path.clear();
   invalidateCompletion();
   rebuildIndex(true);
   if (collectionsVisible) buildCollections();
@@ -736,14 +739,11 @@ void LibraryActivity::activateControl(const int control) {
 void LibraryActivity::onRowEvent(const fui::ActionEvent& event, void* user) {
   auto* self = static_cast<LibraryActivity*>(user);
   if (event.value < 0 || event.value >= self->rowCount()) return;
-  const bool alreadySelected = self->showSelection && self->selection == event.value + CONTROL_COUNT;
   self->selection = event.value + CONTROL_COUNT;
   self->showSelection = true;
   self->app.clearTapFlash();
   if (event.longPress)
     self->showBookActionMenu(event.value);
-  else if (alreadySelected)
-    self->openBook(event.value);
   else
     self->showBookCard(event.value);
 }

@@ -16,8 +16,9 @@ class LibrarySettingsActivity final : public Activity {
   bool blocksGlobalInput() const override { return choicePopup.isActive(); }
 #ifdef SIMULATOR
   void simulatorOpenGrid() { chooseGridSize(); }
-  void simulatorShowFiles() { topIndex = 11; }
+  void simulatorShowFiles() { topIndex = 10; }
   void simulatorApplyGrid(int preset) { applyGridPreset(preset); }
+  bool simulatorHasSetting(StrId key) const;
 #endif
 
  private:
