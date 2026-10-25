@@ -167,12 +167,18 @@ void LibraryActivity::showSummaryCard() {
   card.book.title =
       collectionsVisible || collectionScope == CollectionKind::All ? tr(STR_LIBRARY_ALL_BOOKS) : collectionTitle;
   card.total = rowCount();
-  card.finished = 0;
+  card.finished = collectionsVisible ? allCompleted : 0;
   card.authors.clear();
-  for (int row = 0; row < card.total; ++row) {
-    if ((row & 31) == 31) delay(1);
-    if (completedRow(row)) ++card.finished;
-    if (card.metadata && card.authors.size() < 3 && readBook(row, rowScratch) && !rowScratch.author.empty() &&
+  const bool cachedRows = pageCacheValid && !pageCacheFallback && rowCompletion;
+  const int summaryRows = collectionsVisible ? std::min(3, card.total) : card.total;
+  const int yieldMask = cachedRows ? 1023 : 31;
+  for (int row = 0; row < summaryRows; ++row) {
+    if ((row & yieldMask) == yieldMask) delay(1);
+    if (!collectionsVisible && (cachedRows ? (rowCompletion[row / 8] & (1u << (row % 8))) != 0 : completedRow(row)))
+      ++card.finished;
+    // Match the three cover previews: never scan a whole single-author library
+    // in search of three distinct author names.
+    if (row < 3 && card.metadata && readBook(row, rowScratch) && !rowScratch.author.empty() &&
         std::find(card.authors.begin(), card.authors.end(), rowScratch.author) == card.authors.end())
       card.authors.push_back(rowScratch.author);
   }
