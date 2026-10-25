@@ -16,7 +16,8 @@ ROOT = Path(__file__).resolve().parents[1]
 def fixture(path, number):
     series = ("Garden Tales", "The Reading Room", "Little Adventures", "Quiet Days")[number % 4]
     title = f"{series}: Volume {number // 4 + 1:02}"
-    author = ("Avery Stone", "Robin Reed", "Morgan Page")[number % 3]
+    author = ("Avery Stone", "Robin Reed", "Morgan Page")[number % 3] if number != 37 else ""
+    creator = f"<dc:creator>{author}</dc:creator>" if author else ""
     image = Image.new("1", (150, 225), number % 2 == 0)
     ink = int(number % 2 != 0)
     draw = ImageDraw.Draw(image)
@@ -34,7 +35,7 @@ def fixture(path, number):
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id">
 <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
 <dc:identifier id="id">crossink-library-review-{number}</dc:identifier><dc:title>{escape(title)}</dc:title>
-<dc:creator>{author}</dc:creator><dc:language>en</dc:language><dc:subject>Fiction</dc:subject>
+{creator}<dc:language>en</dc:language><dc:subject>Fiction</dc:subject>
 <meta name="calibre:series" content="{series}"/><meta name="calibre:series_index" content="{number // 4 + 1}"/>
 <meta name="cover" content="cover"/><meta property="dcterms:modified">2026-01-01T00:00:00Z</meta></metadata>
 <manifest><item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/>
@@ -68,8 +69,10 @@ def main():
         card = Path(temporary)
         for i in range(38):
             fixture(card / "fs_/LibraryReview" / ("Fables" if i % 2 else "Stories") / f"book-{i:02}.epub", i)
+        (card / "fs_/My Clippings.txt").write_text("Generated clipping export, not a book.\n", encoding="utf-8")
+        (card / "fs_/LibraryReview/Fables/Notes.txt").write_text("Generated legitimate TXT book.\n", encoding="utf-8")
         if args.fixtures_only:
-            print("Generated 38 isolated EPUB fixtures successfully")
+            print("Generated 38 EPUB fixtures, a TXT book and a clipping export successfully")
             return
         environment = dict(os.environ, SDL_VIDEODRIVER="dummy", CROSSINK_SIMULATOR_SMOKE_TEST="1",
                            CROSSINK_LIBRARY_REVIEW=str(output))

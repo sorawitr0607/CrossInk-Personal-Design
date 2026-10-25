@@ -2,6 +2,7 @@
 #ifdef SIMULATOR
 #include <ArduinoJson.h>
 #include <Epub.h>
+#include <FsHelpers.h>
 #include <HalStorage.h>
 #include <Memory.h>
 
@@ -38,18 +39,46 @@ void LibraryActivity::runSimulatorLibraryReview() {
   // These are generated books in a temporary simulator card, never the user's
   // SD card. Refuse the review before writing a single fixture statistic.
   for (int i = 0; i < index.bookCount(); ++i)
-    check(readIndexedBook(i, rowScratch) && rowScratch.path.rfind("/LibraryReview/", 0) == 0,
+    check(readIndexedBook(i, rowScratch) &&
+              (rowScratch.path.rfind("/LibraryReview/", 0) == 0 || rowScratch.path == "/My Clippings.txt"),
           "Review must run with an isolated generated card");
+  uint16_t progressOnlyOrdinal = UINT16_MAX;
   for (int i = 0; i < index.bookCount(); ++i) {
     check(readIndexedBook(i, rowScratch), "Cannot read fixture");
+    if (!FsHelpers::hasEpubExtension(rowScratch.path)) continue;
     const auto cache = Epub::resolveCachePathForFilePath(rowScratch.path, "/.crosspoint");
     if (!Storage.exists(cache.c_str())) Storage.mkdir(cache.c_str());
     BookReadingStats stats;
     stats.isCompleted = i % 3 == 0;
     check(stats.save(cache), "Cannot save fixture finished state");
-    if (i % 3 == 1) RecentBookProgress::saveCachedEpubPercent(cache, 42.6f);
+    if (!stats.isCompleted && progressOnlyOrdinal == UINT16_MAX) {
+      progressOnlyOrdinal = static_cast<uint16_t>(i);
+      RecentBookProgress::saveCachedEpubPercent(cache, 100.0f);
+    } else if (i % 3 == 1) {
+      RecentBookProgress::saveCachedEpubPercent(cache, 42.6f);
+    }
   }
   invalidateCompletion();
+  unsigned regressionFailures = 0;
+  const auto regression = [&](const bool passed, const char* reason) {
+    ++checks;
+    if (passed) return;
+    ++regressionFailures;
+    std::fprintf(stderr, "LIBRARY REGRESSION FAIL: %s\n", reason);
+  };
+  regression(progressOnlyOrdinal != UINT16_MAX && completedOrdinal(progressOnlyOrdinal),
+             "100-percent progress counts as finished without a manual Finished flag");
+  enterCollections(CollectionKind::Authors);
+  regression(!collectionsFailed && collectionCount >= 3, "One missing author must not erase the Authors tab");
+  enterCollection(-1);
+  bool clippingVisible = false, txtBookVisible = false;
+  for (int row = 0; row < rowCount(); ++row) {
+    check(readBook(row, rowScratch, true), "Cannot read regression book");
+    clippingVisible = clippingVisible || rowScratch.path == "/My Clippings.txt";
+    txtBookVisible = txtBookVisible || rowScratch.path == "/LibraryReview/Fables/Notes.txt";
+  }
+  regression(!clippingVisible && txtBookVisible, "Hide the clipping export while retaining legitimate TXT books");
+  check(regressionFailures == 0, "Library device regression scenarios");
   const auto paint = [&] { render(std::move(reviewLock)); };
   const auto settle = [&] {
     paint();
