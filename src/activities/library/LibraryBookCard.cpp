@@ -183,10 +183,10 @@ void LibraryActivity::showSummaryCard() {
   char counts[128];
   snprintf(counts, sizeof(counts), tr(STR_LIBRARY_CARD_SUMMARY_TEXT), card.total, card.finished);
   card.description.assign(counts);
-  card.series = tr(collectionScope == CollectionKind::All       ? STR_LIBRARY_ALL_BOOKS
-                   : collectionScope == CollectionKind::Authors ? STR_LIBRARY_AUTHORS
-                   : collectionScope == CollectionKind::Folders ? STR_LIBRARY_SD_FOLDERS
-                                                                : STR_LIBRARY_SERIES);
+  card.series = collectionScope == CollectionKind::All       ? tr(STR_LIBRARY_ALL_BOOKS)
+                : collectionScope == CollectionKind::Authors ? tr(STR_LIBRARY_AUTHORS)
+                : collectionScope == CollectionKind::Folders ? tr(STR_LIBRARY_SD_FOLDERS)
+                                                             : tr(STR_LIBRARY_SERIES);
   card.percent = card.total > 0 ? 100.0f * card.finished / card.total : 0;
   card.previewCount = std::min(3, card.total);
   card.repaint = false;
