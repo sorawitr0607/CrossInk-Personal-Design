@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <iterator>
 
 #include "LibraryActivity.h"
 #include "LibraryFonts.h"
@@ -247,7 +248,6 @@ void LibraryActivity::drawBookPager(UiApp::ScreenType& screen, const fui::Rect& 
 }
 
 void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
-  const auto caption = screen.take(fui::LayoutAnchor::Top, 28, 4);
   auto pageIndicator = screen.take(fui::LayoutAnchor::Bottom, 44, 4);
   auto area = screen.body();
   area.x += 12;
@@ -271,22 +271,6 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
   if (newPage) {
     std::fill_n(pageProgress, library_shelf::MAX_VISIBLE_BOOKS, static_cast<int8_t>(-1));
   }
-  const char* captionText = mappedInput.hasTouchHardware()           ? tr(STR_LIBRARY_TAP_HINT)
-                            : collectionScope == CollectionKind::All ? tr(STR_LIBRARY_ALL_BOOKS)
-                                                                     : collectionTitle.c_str();
-  if (showSelection && selection >= CONTROL_COUNT && readBook(selection - CONTROL_COUNT, rowScratch))
-    captionText = rowScratch.title.c_str();
-  renderer.fillRect(caption.x + 8, caption.y, caption.width - 16, caption.height, false);
-  drawBookLabel(captionText, library_shelf::FONT_SMALL, caption.x + 12, caption.y + 2, caption.width - 68);
-  const fui::Rect info{static_cast<int16_t>(caption.right() - 44), caption.y, 44, caption.height};
-  renderer.fillRect(info.x, info.y, info.width, info.height, false);
-  renderer.drawRect(info.x + 13, info.y + 3, 18, 18);
-  renderer.drawText(library_shelf::FONT_SMALL, info.x + 20, info.y + 4, "i");
-  screen.frame().hit(info, 4, -2, fui::InputTouch);
-  const fui::Rect details{caption.x, caption.y, static_cast<int16_t>(caption.width - 44), caption.height};
-  screen.frame().hit(details, 4,
-                     static_cast<int16_t>(showSelection && selection >= CONTROL_COUNT ? selection - CONTROL_COUNT : -2),
-                     fui::InputTouch);
   const bool dense = library_shelf::rows(SETTINGS.libraryGridRows) >= 3;
   const int labelHeight = shelf ? 0 : dense ? 22 : 44;
   const int plankSpace = shelf ? 24 : dense ? 22 : 30;
@@ -309,6 +293,21 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
   library_shelf::ShelfCursor cursor{};
   visibleBookCount = 0;
   const int rowHeight = SETTINGS.libraryListExpanded ? 84 : 62;
+  // A bounded, metadata-free preview of each short shelf's occupied width lets
+  // tall two-column layouts center their books instead of piling them left.
+  int shelfOffsets[4]{};
+  if (shelf && geometry.columns == 2 && geometry.rows >= 3) {
+    library_shelf::ShelfCursor preview{};
+    for (int row = gridPageStart; row < pageEnd; ++row) {
+      const bool done = !pageCacheFallback && rowCompletion && (rowCompletion[row / 8] & (1u << (row % 8)));
+      library_shelf::Placement placed{};
+      if (!library_shelf::place(preview, geometry, area.width, GAP, done, placed, static_cast<uint32_t>(row))) break;
+      shelfOffsets[placed.line] = std::max(shelfOffsets[placed.line], placed.x + placed.width);
+    }
+    std::transform(std::begin(shelfOffsets), std::end(shelfOffsets), std::begin(shelfOffsets), [&](const int used) {
+      return std::max(0, (area.width - geometry.ornamentWidth - geometry.endInset - used) / 2);
+    });
+  }
   if (!list) {
     for (int line = 0; line < geometry.rows; ++line) {
       const int floor = area.y + (line + 1) * geometry.cellHeight + line * GAP - labelHeight - plankSpace;
@@ -325,8 +324,9 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
     const int floor =
         list ? area.y + slot * rowHeight + 49
              : area.y + (placement.line + 1) * geometry.cellHeight + placement.line * GAP - labelHeight - plankSpace;
-    const int x =
-        list ? area.x + 8 : area.x + placement.x + (placement.width - (spine ? placement.width : coverWidth)) / 2;
+    const int x = list ? area.x + 8
+                       : area.x + placement.x + shelfOffsets[placement.line] +
+                             (placement.width - (spine ? placement.width : coverWidth)) / 2;
     const int itemHeight = spine ? placement.height : coverHeight;
     const int y = floor - itemHeight;
     const int width = spine ? placement.width : coverWidth;
@@ -351,15 +351,21 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
     if (spine) {
       const bool dark = row % 3 != 0;
       renderer.fillRect(x + 2, y + 2, width, itemHeight, true);
-      renderer.fillRect(x, y, width, itemHeight, dark);
+      renderer.fillRectDither(x, y, width, itemHeight, row % 3 == 1 ? Color::DarkGray : Color::LightGray);
       renderer.drawRect(x, y, width, itemHeight);
-      renderer.drawLine(x + 3, y + 3, x + 3, floor - 3, 1, !dark);
-      renderer.drawLine(x + 2, y + 8, x + width - 2, y + 8, 1, !dark);
-      renderer.drawLine(x + 2, floor - 8, x + width - 2, floor - 8, 1, !dark);
+      renderer.drawLine(x + 2, y + 2, x + 2, floor - 3, 2, false);
+      renderer.drawLine(x + width - 3, y + 3, x + width - 3, floor - 2, 2, true);
+      renderer.drawLine(x + 2, y + 2, x + width - 3, y + 2, 1, false);
+      renderer.fillRect(x + 4, y + 20, width - 8, std::max(1, itemHeight - 40), dark);
+      renderer.drawRect(x + 3, y + 19, width - 6, std::max(1, itemHeight - 38));
+      for (const int bandY : {y + 8, floor - 10}) {
+        renderer.drawLine(x + 4, bandY, x + width - 5, bandY, 2, true);
+        renderer.drawLine(x + 4, bandY + 2, x + width - 5, bandY + 2, 1, false);
+      }
       // Rotate a bounded title into the actual spine height; never infer page counts.
       subtitleScratch.assign(rowScratch.title);
       while (!subtitleScratch.empty() &&
-             renderer.getTextWidth(library_shelf::FONT_SMALL, subtitleScratch.c_str()) > itemHeight - 24) {
+             renderer.getTextWidth(library_shelf::FONT_SMALL, subtitleScratch.c_str()) > itemHeight - 48) {
         size_t last = subtitleScratch.size() - 1;
         while (last > 0 && (static_cast<unsigned char>(subtitleScratch[last]) & 0xc0) == 0x80) --last;
         subtitleScratch.resize(last);
@@ -445,7 +451,8 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
         if (bookCells[i].line == line) used = std::max<int>(used, bookCells[i].x + bookCells[i].width - area.x + GAP);
       if (SETTINGS.libraryOrnaments) {
         library_shelf::drawOrnament(renderer, SETTINGS.libraryBookshelfTheme, 0, line + bookPageIndex,
-                                    area.x + used + 4, floor, area.width - used - 8, geometry.coverHeight);
+                                    area.x + used + 4, floor, area.width - used - geometry.endInset,
+                                    geometry.coverHeight);
         if (used == 0)
           library_shelf::drawOrnament(renderer, SETTINGS.libraryBookshelfTheme, 1, line, area.x + 10, floor - 24,
                                       std::min<int>(120, area.width / 3), geometry.coverHeight - 24);

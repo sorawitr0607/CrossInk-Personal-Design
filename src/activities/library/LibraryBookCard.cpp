@@ -90,7 +90,7 @@ bool LibraryActivity::allocateBookCard() {
   bookCard->book.title.reserve(512);
   bookCard->book.author.reserve(512);
   bookCard->titleLines.reserve(2);
-  bookCard->descriptionLines.reserve(5);
+  bookCard->descriptionLines.reserve(6);
   bookCard->authors.reserve(3);
   return true;
 }
@@ -98,7 +98,7 @@ bool LibraryActivity::allocateBookCard() {
 void LibraryActivity::prepareBookCard() {
   auto& card = *bookCard;
   const int width = std::min(440, renderer.getScreenWidth() - 24);
-  const int height = std::min(440, renderer.getScreenHeight() - 80);
+  const int height = std::min(520, renderer.getScreenHeight() - 80);
   const auto rect = [](const int x, const int y, const int w, const int h) {
     return freeink::ui::Rect{static_cast<int16_t>(x), static_cast<int16_t>(y), static_cast<int16_t>(w),
                              static_cast<int16_t>(h)};
@@ -109,7 +109,9 @@ void LibraryActivity::prepareBookCard() {
   card.closeButton = rect(card.dialog.x + width - 120, card.dialog.y + height - 56, 104, 40);
   card.titleLines = renderer.wrappedText(library_shelf::FONT_BODY, card.book.title.c_str(), width - 160, 2);
   const char* description = card.description.empty() ? tr(STR_LIBRARY_CARD_NO_DESCRIPTION) : card.description.c_str();
-  card.descriptionLines = renderer.wrappedText(library_shelf::FONT_SMALL, description, width - 32, 5);
+  const int lineStep = renderer.getLineHeight(library_shelf::FONT_CARD) + 4;
+  const int lines = std::max(1, std::min(6, (height - 56 - 20 - 245) / lineStep));
+  card.descriptionLines = renderer.wrappedText(library_shelf::FONT_CARD, description, width - 32, lines);
   card.coverTask = 0;
   card.pressed = 0;
   bookCardActive = true;
@@ -296,8 +298,8 @@ void LibraryActivity::drawBookCard() {
                       true);
   y = box.y + 245;
   for (const auto& line : card.descriptionLines) {
-    renderer.drawText(library_shelf::FONT_SMALL, box.x + 16, y, line.c_str());
-    y += renderer.getLineHeight(library_shelf::FONT_SMALL);
+    renderer.drawText(library_shelf::FONT_CARD, box.x + 16, y, line.c_str());
+    y += renderer.getLineHeight(library_shelf::FONT_CARD) + 4;
   }
   if (!card.summary) {
     renderer.fillRect(card.openButton.x, card.openButton.y, card.openButton.width, card.openButton.height, true);

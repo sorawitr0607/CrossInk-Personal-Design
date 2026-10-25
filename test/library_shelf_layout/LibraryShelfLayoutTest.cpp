@@ -18,7 +18,9 @@ int main() {
   check(pageSize(2, 2) == 4, "2 x 2 shows four books per page");
   check(pageSize(3, 2) == 6, "3 x 2 means columns then rows");
   check(pageSize(2, 3) == 6, "2 x 3 retains six books with a different arrangement");
-  check(pageSize(4, 4) == 16, "maximum visible page stays bounded at sixteen books");
+  check(pageSize(4, 3) == 12, "largest selectable cover grid shows twelve books");
+  check(GRID_PRESET_COUNT == 7 && presetIndex(3, 4) == 1 && presetIndex(4, 4) == 1,
+        "Removed 3x4 and 4x4 choices fall back to the default preset");
   check(pageSize(255, 0) == 6, "corrupt saved dimensions fall back safely");
   check(pageCount(5, 4) == 2 && pageStart(4, 4) == 4, "fifth book moves to second 2 x 2 page");
   check(pageCount(0, 4) == 1 && pageStart(-1, 4) == 0, "empty libraries do not produce negative pages");
@@ -104,8 +106,10 @@ int main() {
           }
           if (!spine) ++faces;
           check(faces <= preset.columns, "chosen columns cap face-out covers on each shelf");
-          check(placement.x >= 0 && placement.x + placement.width <= 432, "natural books stay on their plank");
-          check(placement.x + placement.width <= 432 - layout.ornamentWidth, "keepsakes retain their own shelf space");
+          check(placement.x >= layout.endInset && placement.x + placement.width <= 432 - layout.endInset,
+                "natural books leave clearance at both plank ends");
+          check(placement.x + placement.width <= 432 - layout.ornamentWidth - layout.endInset,
+                "keepsakes retain their own shelf space");
           check(placement.height > 0 && placement.height <= layout.coverHeight, "varied spines fit shelf height");
           check(cursor.count <= MAX_VISIBLE_BOOKS && placement.line < preset.rows, "natural shelf hit budget");
           if (!spine) check(placement.width == layout.coverWidth, "Shelf packs cover widths rather than grid cells");

@@ -35,6 +35,9 @@ void LibraryActivity::runSimulatorLibraryReview() {
   check(renderer.getTextWidth(library_shelf::FONT_BODY, "All Books") > 0 &&
             renderer.getTextWidth(library_shelf::FONT_HEADING, "Your little library") > 0,
         "Library serif bitmap fonts registered");
+  check(renderer.getTextAdvanceX(library_shelf::FONT_CARD, " ", EpdFontFamily::REGULAR) >= 4 &&
+            renderer.getLineHeight(library_shelf::FONT_CARD) > renderer.getLineHeight(library_shelf::FONT_SMALL),
+        "Card descriptions use a larger font with readable word spaces");
   check(index.bookCount() >= 20, "Missing generated LibraryReview fixtures");
   // These are generated books in a temporary simulator card, never the user's
   // SD card. Refuse the review before writing a single fixture statistic.
@@ -247,6 +250,23 @@ void LibraryActivity::runSimulatorLibraryReview() {
                     cell.y + cell.height <= renderer.getScreenHeight(),
                 "Cover stays within display");
         }
+        if (view == library_shelf::Shelf && preset.columns == 2 && preset.rows >= 3) {
+          snprintf(name, sizeof(name), "theme-%u-shelf-2x%u", theme, preset.rows);
+          capture(name);
+          int left = renderer.getScreenWidth(), right = 0;
+          for (int i = 0; i < visibleBookCount; ++i) {
+            if (bookCells[i].line != 0) continue;
+            left = std::min<int>(left, bookCells[i].x);
+            right = std::max<int>(right, bookCells[i].x + bookCells[i].width);
+          }
+          const auto layout =
+              library_shelf::shelfGeometry(pageCacheWidth, pageCacheHeight, 2, preset.rows, SETTINGS.libraryOrnaments);
+          const int areaLeft = (renderer.getScreenWidth() - pageCacheWidth) / 2;
+          const int leftGap = left - areaLeft - layout.endInset;
+          const int rightGap = areaLeft + pageCacheWidth - layout.ornamentWidth - layout.endInset - right;
+          check(leftGap >= 0 && rightGap >= 0 && std::abs(leftGap - rightGap) <= 1,
+                "Tall two-column books are balanced and stay clear of shelf ends");
+        }
       }
     }
   }
@@ -274,7 +294,8 @@ void LibraryActivity::runSimulatorLibraryReview() {
   enterCollection(0);
   paint();
   check(pageCacheValid && !pageCacheFallback && rowCompletion, "Summary reuses the shelf completion cache");
-  showSummaryCard();
+  handleInput({LibraryInputBuffer::Type::TouchPress, 100, 56});
+  handleInput({LibraryInputBuffer::Type::TouchRelease, 100, 56});
   check(bookCardActive && bookCard->summary && bookCard->total == rowCount() && bookCard->finished > 0 &&
             bookCard->finished < bookCard->total,
         "Collection card summarizes its own filtered books and completion");
@@ -364,6 +385,13 @@ void LibraryActivity::runSimulatorLibraryReview() {
   SETTINGS.fromJson(saved.as<JsonVariantConst>());
   check(SETTINGS.libraryBookView == library_shelf::Shelf && SETTINGS.libraryBookshelfTheme == library_shelf::Cozy,
         "Library settings round trip");
+  saved["libraryGridColumns"] = 3;
+  saved["libraryGridRows"] = 4;
+  SETTINGS.fromJson(saved.as<JsonVariantConst>());
+  check(SETTINGS.libraryGridColumns == 3 && SETTINGS.libraryGridRows == 2, "Saved 3x4 migrates to 3x2");
+  saved["libraryGridColumns"] = 4;
+  SETTINGS.fromJson(saved.as<JsonVariantConst>());
+  check(SETTINGS.libraryGridColumns == 3 && SETTINGS.libraryGridRows == 2, "Saved 4x4 migrates to 3x2");
   saved["libraryBookshelfTheme"] = 3;
   SETTINGS.fromJson(saved.as<JsonVariantConst>());
   check(SETTINGS.libraryBookshelfTheme == library_shelf::Autumn, "Existing Autumn theme ID is preserved");

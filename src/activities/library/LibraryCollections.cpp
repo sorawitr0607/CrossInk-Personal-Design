@@ -361,6 +361,7 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
     if (!drawCachedCover(rowScratch, x, y, ALL_COVER_WIDTH, ALL_COVER_HEIGHT))
       renderer.drawRect(x, y, ALL_COVER_WIDTH, ALL_COVER_HEIGHT);
   }
+  if (theme == library_shelf::Autumn) renderer.fillRect(all.x + 80, all.y + 4, all.width - 114, 49, false);
   drawBookLabel(tr(STR_LIBRARY_ALL_BOOKS), library_shelf::FONT_BODY, all.x + 82, all.y + 5, all.width - 110);
   char counts[64], finished[28];
   snprintf(counts, sizeof(counts), tr(STR_LIBRARY_BOOKS_COUNT), static_cast<unsigned>(rowCount()));
@@ -425,6 +426,7 @@ void LibraryActivity::buildCollectionScreen(UiApp::ScreenType& screen) {
                                   std::min(30, floor - coverHeight - 12 - (area.y + line * cellHeight)));
     const int plateX = cx + (cellWidth - art.plate->width) / 2;
     library_shelf::drawSprite(renderer, *art.plate, plateX, floor + 29);
+    if (theme == library_shelf::Autumn) renderer.fillRect(plateX + 10, floor + 31, art.plate->width - 20, 43, false);
     if (collectionLabel(group, collectionScratch))
       drawBookLabel(collectionScratch.c_str(), library_shelf::FONT_BODY, plateX + 10, floor + 32, art.plate->width - 20,
                     true);

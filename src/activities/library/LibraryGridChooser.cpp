@@ -24,10 +24,10 @@ void LibrarySettingsActivity::applyGridPreset(const int selected) {
 }
 
 void LibrarySettingsActivity::drawGridChooser(UiApp::ScreenType& screen) {
-  static constexpr StrId labels[] = {
-      StrId::STR_LIBRARY_GRID_2_2, StrId::STR_LIBRARY_GRID_3_2, StrId::STR_LIBRARY_GRID_2_3,
-      StrId::STR_LIBRARY_GRID_3_3, StrId::STR_LIBRARY_GRID_4_2, StrId::STR_LIBRARY_GRID_2_4,
-      StrId::STR_LIBRARY_GRID_4_3, StrId::STR_LIBRARY_GRID_3_4, StrId::STR_LIBRARY_GRID_4_4};
+  static constexpr StrId labels[] = {StrId::STR_LIBRARY_GRID_2_2, StrId::STR_LIBRARY_GRID_3_2,
+                                     StrId::STR_LIBRARY_GRID_2_3, StrId::STR_LIBRARY_GRID_3_3,
+                                     StrId::STR_LIBRARY_GRID_4_2, StrId::STR_LIBRARY_GRID_2_4,
+                                     StrId::STR_LIBRARY_GRID_4_3};
   const auto note = screen.take(fui::LayoutAnchor::Top, 70, 12);
   auto style = screen.theme().smallText;
   style.maxLines = 3;
@@ -39,7 +39,9 @@ void LibrarySettingsActivity::drawGridChooser(UiApp::ScreenType& screen) {
   const int height = std::min(156, (area.height - 2 * gap) / 3);
   for (int i = 0; i < library_shelf::GRID_PRESET_COUNT; ++i) {
     const auto preset = library_shelf::GRID_PRESETS[i];
-    const fui::Rect tile{static_cast<int16_t>(area.x + i % 3 * (width + gap)),
+    const int rowColumns = std::min(3, library_shelf::GRID_PRESET_COUNT - i / 3 * 3);
+    const int rowOffset = (area.width - rowColumns * width - (rowColumns - 1) * gap) / 2;
+    const fui::Rect tile{static_cast<int16_t>(area.x + rowOffset + i % 3 * (width + gap)),
                          static_cast<int16_t>(area.y + i / 3 * (height + gap)), static_cast<int16_t>(width),
                          static_cast<int16_t>(height)};
     const bool selected = i == gridSelection;

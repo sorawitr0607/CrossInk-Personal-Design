@@ -34,7 +34,7 @@ def generate_fonts():
     if output.exists() and digest in output.read_text(encoding="utf-8")[:160]:
         return
     parts = [f"// Generated Library bitmap fonts; source SHA256 {digest}\n"]
-    for name, points, source in (("small", 6, FONT), ("body", 8, FONT), ("heading", 12, italic)):
+    for name, points, source in (("small", 6, FONT), ("body", 8, FONT), ("heading", 12, italic), ("card", 10, FONT)):
         command = [sys.executable, str(converter), f"library_{name}", str(points), str(source),
                    "--no-default-intervals"]
         for interval in ("0x20,0x24f", "0x300,0x52f", "0x1ea0,0x1eff", "0x2000,0x206f", "0x20a0,0x20cf", "0xfffd,0xfffd"):
@@ -44,7 +44,7 @@ def generate_fonts():
             raise RuntimeError(f"Library {name} font generation failed: {result.stderr[-1000:]}")
         parts.append(result.stdout)
     output.write_text("\n".join(parts), encoding="utf-8")
-    print("Library labels: three flash-only bitmap sizes; no scalable font workspace")
+    print("Library text: four flash-only bitmap sizes; no scalable font workspace")
 
 
 def generate():
@@ -111,9 +111,12 @@ def generate():
 
         wall = theme["wall"]["tile"]
         quiet = theme["wall"].get("quiet", wall)
-        wall_name = sprite(name + "_wall", raster(wall["w"], wall["h"], wall["svg"], 120, 120))
+        wall_image = raster(wall["w"], wall["h"], wall["svg"], 120, 120)
+        if name == "autumn":
+            wall_image.putalpha(wall_image.getchannel("A").point(lambda alpha: alpha // 4))
+        wall_name = sprite(name + "_wall", wall_image)
         quiet_image = raster(quiet["w"], quiet["h"], quiet["svg"], 120, 120)
-        quiet_image.putalpha(quiet_image.getchannel("A").point(lambda alpha: alpha // 3))
+        quiet_image.putalpha(quiet_image.getchannel("A").point(lambda alpha: alpha // (7 if name == "autumn" else 3)))
         quiet_name = sprite(name + "_quiet", quiet_image)
         hero = theme["hero"]
         hero_name = sprite(name + "_hero", raster(hero["w"], hero["h"], hero["svg"], 138, 74))

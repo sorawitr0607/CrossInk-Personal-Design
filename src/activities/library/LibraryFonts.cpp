@@ -14,8 +14,8 @@ namespace library_shelf {
 #if CROSSINK_SCALABLE_FONTS
 namespace {
 // Uncompressed one-bit glyphs and metrics remain in flash on every device.
-// Only three entries in the existing renderer map are needed during Library.
-const EpdFont small(&library_small), body(&library_body), heading(&library_heading);
+// Only four entries in the existing renderer map are needed during Library.
+const EpdFont small(&library_small), body(&library_body), heading(&library_heading), card(&library_card);
 EpdFont fallback(nullptr);
 }  // namespace
 #endif
@@ -28,6 +28,7 @@ void registerFonts(GfxRenderer& renderer) {
   renderer.insertFont(FONT_SMALL, EpdFontFamily(&small, nullptr, nullptr, nullptr, recovery));
   renderer.insertFont(FONT_BODY, EpdFontFamily(&body, nullptr, nullptr, nullptr, recovery));
   renderer.insertFont(FONT_HEADING, EpdFontFamily(&heading, nullptr, nullptr, nullptr, recovery));
+  renderer.insertFont(FONT_CARD, EpdFontFamily(&card, nullptr, nullptr, nullptr, recovery));
 #else
   // C3 already includes bitmap reader fonts and has a tight app partition.
   // Alias those resident families instead of linking another copy of glyphs.
@@ -43,6 +44,7 @@ void registerFonts(GfxRenderer& renderer) {
   insertAlias(FONT_SMALL, SMALL_FONT_ID);
   insertAlias(FONT_BODY, BITTER_10_FONT_ID);
   insertAlias(FONT_HEADING, BITTER_12_FONT_ID);
+  insertAlias(FONT_CARD, BITTER_10_FONT_ID);
 #endif
 }
 
@@ -50,5 +52,6 @@ void unregisterFonts(GfxRenderer& renderer) {
   renderer.removeFont(FONT_SMALL);
   renderer.removeFont(FONT_BODY);
   renderer.removeFont(FONT_HEADING);
+  renderer.removeFont(FONT_CARD);
 }
 }  // namespace library_shelf

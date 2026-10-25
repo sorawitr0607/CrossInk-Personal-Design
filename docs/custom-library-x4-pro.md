@@ -20,6 +20,11 @@ activity have no intentional behavior changes.
   Recently Opened contains books already in the existing recent history.
 - Refresh, Search, Settings, Display, and Show Files remain available.
 - Book view, grid dimensions, and shelf theme are Library-specific settings.
+  Available grids are 2 x 2, 3 x 2, 2 x 3, 3 x 3, 4 x 2, 2 x 4 and 4 x 3;
+  saved 3 x 4 and 4 x 4 choices migrate to 3 x 2. Shelf books have clear space
+  at both plank ends; tall two-column shelves center the book group. Finished
+  spines have shaded bindings, raised bands and inset title panels. Autumn
+  wallpaper is lighter, with clear label panels. The book hint strip is removed.
   Grid size appears in Shelf and Covers; List density appears in List. Show
   series tags and Show genre tags control metadata labels. Theme, background
   and ornament controls remain available because they also affect collections.
@@ -44,15 +49,15 @@ activity have no intentional behavior changes.
   Close buttons. Missing descriptions have a plain fallback. Long press retains
   the original book actions. Every short book tap opens its card, including an
   already-selected book. Read this book (or the cover inside the card) opens the
-  reader. The title strip can reopen the selected card.
-- The landing header opens the current-reading card. The info button inside a
+  reader. Tapping the collection name in the header opens its summary, including All Books.
+- The landing header opens the current-reading card. The collection title inside a
   collection or All Books opens a summary of that view. Cards overlay the shelf
   without changing its layout; Back or tapping outside closes them. Refresh
   invalidates the cached card so replacing an EPUB at the same path reloads its
-  metadata. Paragraphs and line breaks retain word spacing in descriptions.
-- The 3 x 2 Shelf and Covers books are slightly larger; 2 x 2 books are slightly
-  smaller. Other presets keep their existing sizing. Collections open with one
-  tap. First, previous, next and last page controls remain available.
+  metadata. Paragraphs and line breaks retain word spacing in descriptions. Descriptions
+  use a larger 10-point Library bitmap font, left alignment and extra line spacing.
+- Tall two-column shelves use larger covers and center their book groups.
+  Collections open with one tap. First, previous, next and last page controls remain available.
 
 The collection cache holds compact book references using the existing
 PSRAM-aware allocator. Thumbnail work is limited to the visible page, processes
@@ -65,7 +70,7 @@ reader-cache format change. Browsing an unopened cover does not add a recent
 history entry. Battery life still needs measurement on a physical reader.
 Two themes use 74,276 bytes
 of packed flash masks with no SVG parser, runtime resize, animation or extra
-framebuffer. Library text uses three small one-bit bitmap font sizes in flash,
+framebuffer. Library text uses four small one-bit bitmap font sizes in flash,
 registered only for the Library visit. It does not activate a scalable font
 workspace. C3 devices alias their existing bitmap fonts to stay within the app
 partition. Exact finished counts read cached statistics once per book per
@@ -84,9 +89,9 @@ cppcheck, checks the shared code with a C3 build, then builds `x4-pro` and the
 native X4 Pro simulator. Simulator checks use generated books in a temporary
 card and capture actual one-bit Library output; no personal books are included.
 
-Successful runs provide the `crossink-1.6.1-library.4-x4-pro` artifact containing:
+Successful runs provide the `crossink-1.6.1-library.5-x4-pro` artifact containing:
 
-- `firmware-x4-pro-v1.6.1-library.4.bin`: the X4 Pro application image.
+- `firmware-x4-pro-v1.6.1-library.5.bin`: the X4 Pro application image.
 - `SHA256SUMS.txt` and `manifest.json`: integrity and build provenance.
 - `source.patch`: the exact patch against the pinned base, including formatting
   applied during the build.
@@ -115,8 +120,8 @@ image decoding on hardware, or battery usage.
    collection, try Title, Series, and Recently Opened sorting, and change the
    grid size, the two shelf themes, backgrounds and ornaments in Library Settings.
 6. Tap a book to inspect its card, close it with Back, then reopen it from the
-   title strip. Check Read this book, the landing current-reading header and a
-   collection's info button. Verify that the shelf stays in place under the card.
+   shelf. Check Read this book, the landing current-reading header and a
+   collection title. Verify that the shelf stays in place under the card.
 7. Check Search, Refresh, file-type toggles, Back navigation, and saved settings
    after a restart. Confirm an unopened cover did not add a recent-history entry.
    Check an existing book's progress, bookmarks, and reading statistics.

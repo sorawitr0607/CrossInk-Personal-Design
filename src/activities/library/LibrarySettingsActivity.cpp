@@ -27,7 +27,7 @@ int logicalRow(int row) {
 }
 constexpr StrId GRID_LABELS[] = {StrId::STR_LIBRARY_GRID_2_2, StrId::STR_LIBRARY_GRID_3_2, StrId::STR_LIBRARY_GRID_2_3,
                                  StrId::STR_LIBRARY_GRID_3_3, StrId::STR_LIBRARY_GRID_4_2, StrId::STR_LIBRARY_GRID_2_4,
-                                 StrId::STR_LIBRARY_GRID_4_3, StrId::STR_LIBRARY_GRID_3_4, StrId::STR_LIBRARY_GRID_4_4};
+                                 StrId::STR_LIBRARY_GRID_4_3};
 constexpr StrId SHELF_LABELS[] = {StrId::STR_LIBRARY_SHELF_COZY, StrId::STR_LIBRARY_SHELF_AUTUMN};
 constexpr StrId VIEW_LABELS[] = {StrId::STR_LIBRARY_VIEW_SHELF, StrId::STR_LIBRARY_VIEW_COVERS, StrId::STR_LIST_VIEW};
 constexpr StrId BACKGROUND_LABELS[] = {StrId::STR_OFF, StrId::STR_LIBRARY_BACKGROUND_QUIET,

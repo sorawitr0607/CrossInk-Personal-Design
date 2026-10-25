@@ -904,7 +904,10 @@ void LibraryActivity::handleInput(const LibraryInputBuffer::Event& input) {
   if (input.type == Type::TouchRelease && input.x >= 0 && input.y >= 0) {
     const auto header = TouchHeaderBackButton::headerRect(renderer, mappedInput);
     const auto back = TouchHeaderBackButton::layout(header).touchRect;
-    if (input.y < header.y + header.height && input.x >= back.x && input.x < back.x + back.width && input.y >= back.y &&
+    const int backRight = collectionsVisible
+                              ? back.x + back.width
+                              : std::min(back.x + back.width, TouchHeaderBackButton::layout(header).titleX);
+    if (input.y < header.y + header.height && input.x >= back.x && input.x < backRight && input.y >= back.y &&
         input.y < back.y + back.height) {
       pendingInput.clear();
       returnToCollections();
@@ -1214,6 +1217,14 @@ void LibraryActivity::buildListScreen(UiApp::ScreenType& screen) {
   const auto header = TouchHeaderBackButton::headerRect(renderer, mappedInput);
   const int16_t right = static_cast<int16_t>(renderer.getScreenWidth() - bounds[1] - headerControlRightInset());
   if (mappedInput.hasTouchHardware()) {
+    if (!collectionsVisible) {
+      const int titleX = TouchHeaderBackButton::layout(header).titleX;
+      const int titleRight = right - 3 * controlSize - 2 * HEADER_CONTROL_GAP - 10;
+      screen.frame().hit(
+          fui::Rect{static_cast<int16_t>(titleX), static_cast<int16_t>(header.y),
+                    static_cast<int16_t>(std::max(0, titleRight - titleX)), static_cast<int16_t>(header.height)},
+          ACTION_CARD, -2, fui::InputTouch);
+    }
     fui::ButtonProps action;
     action.action = ACTION_CONTROL;
     action.inputMask = fui::InputTouch;

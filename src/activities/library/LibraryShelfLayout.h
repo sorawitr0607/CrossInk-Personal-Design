@@ -9,7 +9,7 @@ struct GridPreset {
   uint8_t rows;
 };
 
-inline constexpr GridPreset GRID_PRESETS[] = {{2, 2}, {3, 2}, {2, 3}, {3, 3}, {4, 2}, {2, 4}, {4, 3}, {3, 4}, {4, 4}};
+inline constexpr GridPreset GRID_PRESETS[] = {{2, 2}, {3, 2}, {2, 3}, {3, 3}, {4, 2}, {2, 4}, {4, 3}};
 inline constexpr uint8_t GRID_PRESET_COUNT = sizeof(GRID_PRESETS) / sizeof(GRID_PRESETS[0]);
 
 enum View : uint8_t { Shelf, Covers, List, ViewCount };
@@ -41,6 +41,7 @@ struct Geometry {
   int coverHeight;
   bool natural = false;
   int ornamentWidth = 0;
+  int endInset = 0;
 };
 
 constexpr int atLeastOne(const int value) { return value > 0 ? value : 1; }
@@ -62,11 +63,12 @@ constexpr Geometry shelfGeometry(const int width, const int height, const uint8_
                                  const bool ornaments) {
   const int c = columns(cols), r = rows(lines);
   const int cellHeight = atLeastOne((height - (r - 1) * 8) / r);
-  const int reserve = ornaments ? smaller(c == 3 && r == 2 ? 72 : 96, width / 4) : 0;
-  const int availableWidth = atLeastOne((width - reserve - (c - 1) * 9 - 16) / c);
-  const int baseWidth = atLeastOne(smaller(availableWidth, atLeastOne(cellHeight - 48) * 2 / 3));
+  constexpr int endInset = 12;
+  const int reserve = ornaments ? smaller(c == 3 && r == 2 ? 56 : r >= 3 ? 64 : 96, width / 4) : 0;
+  const int availableWidth = atLeastOne((width - 2 * endInset - reserve - (c - 1) * 9 - 16) / c);
+  const int baseWidth = atLeastOne(smaller(availableWidth, atLeastOne(cellHeight - (r >= 3 ? 32 : 48)) * 2 / 3));
   const int coverWidth = c == 2 && r == 2 ? atLeastOne(baseWidth * 92 / 100) : baseWidth;
-  return {c, r, atLeastOne(width / c), cellHeight, coverWidth, coverWidth * 3 / 2, true, reserve};
+  return {c, r, atLeastOne(width / c), cellHeight, coverWidth, coverWidth * 3 / 2, true, reserve, endInset};
 }
 
 // Greedy shelf packing. Finished books take a narrow spine; every other book
@@ -89,13 +91,13 @@ inline bool place(ShelfCursor& cursor, const Geometry& geometry, const int width
                   Placement& out, const uint32_t seed = 0) {
   if (cursor.count >= MAX_VISIBLE_BOOKS) return false;
   // Decorative binding variation, not an estimate of the book's page count.
-  const int binding = smaller(30, (geometry.coverHeight / 8 + 2) + static_cast<int>(seed % 7));
+  const int binding = smaller(34, (geometry.coverHeight / 8 + 4) + static_cast<int>(seed % 7));
   const int itemWidth =
-      spine ? (geometry.natural ? smaller(geometry.coverWidth, binding < 14 ? 14 : binding) : spineWidth(geometry))
+      spine ? (geometry.natural ? smaller(geometry.coverWidth, binding < 22 ? 22 : binding) : spineWidth(geometry))
       : geometry.natural ? geometry.coverWidth
                          : geometry.cellWidth;
   int spacing = cursor.x == 0 ? 0 : geometry.natural && spine && cursor.previousSpine ? 1 : gap;
-  if (cursor.x > 0 && (cursor.x + spacing + itemWidth > width - geometry.ornamentWidth ||
+  if (cursor.x > 0 && (cursor.x + spacing + itemWidth > width - geometry.ornamentWidth - 2 * geometry.endInset ||
                        cursor.lineCount >= MAX_VISIBLE_BOOKS / geometry.rows ||
                        (geometry.natural && !spine && cursor.faces >= geometry.columns))) {
     cursor.x = 0;
@@ -107,7 +109,7 @@ inline bool place(ShelfCursor& cursor, const Geometry& geometry, const int width
   if (cursor.line >= geometry.rows) return false;
   const int itemHeight = geometry.natural && spine ? geometry.coverHeight * (84 + static_cast<int>(seed % 15)) / 100
                                                    : geometry.coverHeight;
-  out = {cursor.x + spacing, cursor.line, itemWidth, itemHeight};
+  out = {cursor.x + spacing + geometry.endInset, cursor.line, itemWidth, itemHeight};
   cursor.x += spacing + itemWidth;
   ++cursor.count;
   ++cursor.lineCount;

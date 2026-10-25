@@ -693,6 +693,11 @@ bool CrossPointSettings::fromJson(JsonVariantConst doc, bool importingCrossPoint
   readLibraryChoice("libraryBackground", libraryBackground, 3);
   if (libraryGridColumns < 2) libraryGridColumns = 3;
   if (libraryGridRows < 2) libraryGridRows = 2;
+  if (libraryGridRows == 4 && libraryGridColumns >= 3) {
+    libraryGridColumns = 3;
+    libraryGridRows = 2;
+    needsResave = true;
+  }
   // A missing or corrupt legacy choice uses List, even if this object loaded another document earlier.
   recentBooksView = RECENT_BOOKS_LIST;
   readLibraryChoice("recentBooksView", recentBooksView, RECENT_BOOKS_VIEW_COUNT);
