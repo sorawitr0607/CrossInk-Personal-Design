@@ -4,18 +4,22 @@
 #include <Epub.h>
 #include <FsHelpers.h>
 #include <HalStorage.h>
+#include <LibraryGenreOverride.h>
 #include <LibraryText.h>
 #include <Memory.h>
 
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
 
 #include "LibraryActivity.h"
 #include "LibraryFonts.h"
 #include "LibrarySettingsActivity.h"
 #include "activities/home/RecentBookProgress.h"
 #include "activities/reader/BookReadingStats.h"
+#include "activities/util/OptionSelectionActivity.h"
 
 void LibraryActivity::runSimulatorLibraryReview() {
   const char* output = std::getenv("CROSSINK_LIBRARY_REVIEW");
@@ -453,6 +457,66 @@ void LibraryActivity::runSimulatorLibraryReview() {
   SETTINGS.fromJson(saved.as<JsonVariantConst>());
   check(SETTINGS.libraryBookshelfTheme == library_shelf::Cozy, "Removed themes fall back to Cozy Nook");
   check(RECENT_BOOKS.getCount() == recentCountBefore, "Unopened covers never enter recent history");
+  enterCollections(CollectionKind::Series);
+  scienceTopic = -1;
+  for (int group = 0; group < collectionCount; ++group)
+    if (collections[group].isTopic() && collectionLabel(collections[group], collectionScratch) &&
+        library::fold(collectionScratch) == "science fiction")
+      scienceTopic = group;
+  check(scienceTopic >= 0, "Find non-series book for the genre editor");
+  enterCollection(scienceTopic);
+  check(readBook(0, rowScratch), "Read genre-edit book");
+  const auto genreBook = rowScratch;
+  const auto originalFile = [&] {
+    std::ifstream file(std::filesystem::path("fs_") / genreBook.path.substr(1), std::ios::binary);
+    check(file.good(), "Genre test uses a real isolated EPUB");
+    return std::string(std::istreambuf_iterator<char>(file), std::istreambuf_iterator<char>());
+  }();
+  showBookCard(0);
+  const auto originalGenre = bookCard->genre;
+  const auto originalPercent = bookCard->percent;
+  auto choices = genrePickerChoices();
+  check(choices.labels.size() >= 14 && choices.labels.size() <= 46 &&
+            choices.labels[0] == tr(STR_LIBRARY_GENRE_USE_METADATA) &&
+            choices.labels[1] == tr(STR_LIBRARY_GENRE_CUSTOM),
+        "Bounded picker includes restore, custom and preset genres");
+  auto picker = makeUniqueNoThrow<OptionSelectionActivity>(renderer, mappedInput, "LibraryGenrePickerReview",
+                                                           StrId::STR_LIBRARY_CHANGE_GENRE, std::move(choices.labels),
+                                                           choices.selected, false, true);
+  check(picker != nullptr, "Genre picker allocation");
+  picker->onEnter();
+  picker->render(RenderLock(nullptr));
+  saveImage("genre-picker");
+  picker->onExit();
+  picker.reset();
+  saveBookGenre(genreBook, "Business & Management");
+  check(bookCardActive && bookCard->genre == "Business & Management" && bookCard->percent == originalPercent,
+        "Saving a genre updates the card while retaining progress");
+  check(collectionsVisible && collectionTab == CollectionKind::Series,
+        "A book moved from its old topic returns to the collection tiles");
+  capture("genre-card-assigned");
+  closeBookCard();
+  int businessTopic = -1;
+  for (int group = 0; group < collectionCount; ++group)
+    if (collections[group].isTopic() && collectionLabel(collections[group], collectionScratch) &&
+        collectionScratch == "Business & Management")
+      businessTopic = group;
+  check(businessTopic >= 0 && collections[businessTopic].count == 1,
+        "Assigned genre reorganizes topic tiles immediately");
+  enterCollection(businessTopic);
+  check(rowCount() == 1 && readBook(0, rowScratch) && rowScratch.path == genreBook.path,
+        "The assigned topic opens exactly the edited book");
+  refreshLibrary();
+  check(rowCount() == 1, "Manual genre survives a full Library refresh");
+  saveBookGenre(genreBook, "", true);
+  check(bookCard->genre == originalGenre && bookCard->percent == originalPercent,
+        "Use book metadata restores the original embedded genre and preserves progress");
+  std::ifstream unchanged(std::filesystem::path("fs_") / genreBook.path.substr(1), std::ios::binary);
+  check(std::string(std::istreambuf_iterator<char>(unchanged), std::istreambuf_iterator<char>()) == originalFile,
+        "On-device genre editing never changes the EPUB or its hash");
+  closeBookCard();
+  enterCollections(CollectionKind::Series);
+  enterCollection(0);
   showBookCard(0);
   check(bookCardActive, "Open the final Read this book action fixture");
   const auto read = bookCard->openButton;

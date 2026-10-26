@@ -6,6 +6,7 @@
 #include <LibraryIndexFile.h>
 #include <LibrarySort.h>
 
+#include <array>
 #include <memory>
 #include <string>
 #include <vector>
@@ -172,7 +173,7 @@ class LibraryActivity final : public Activity {
     RecentBook book;
     std::string description, series, genre, seriesPosition;
     std::vector<std::string> titleLines, descriptionLines, authors;
-    freeink::ui::Rect dialog{}, openButton{}, closeButton{}, cover{};
+    freeink::ui::Rect dialog{}, openButton{}, closeButton{}, genreButton{}, cover{};
     int total = 0, finished = 0;
     float percent = -1;
     int coverTask = 0, previewCount = 0, pressed = 0;
@@ -205,6 +206,15 @@ class LibraryActivity final : public Activity {
   void loadBookCardCovers();
   void handleBookCardInput(const LibraryInputBuffer::Event& input);
   void closeBookCard();
+  struct GenreChoices {
+    std::vector<std::string> labels;
+    std::array<uint16_t, 32> extras{};
+    size_t extraCount = 0;
+    uint8_t selected = 0;
+  };
+  GenreChoices genrePickerChoices();
+  void openGenrePicker();
+  void saveBookGenre(const RecentBook& book, const std::string& genre, bool useMetadata = false);
   static void provideRow(void* user, uint16_t row, freeink::ui::ListItem& item);
   void buildListScreen(UiApp::ScreenType& screen);
   void buildGrid(UiApp::ScreenType& screen);

@@ -3,6 +3,7 @@
 #include <FsHelpers.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <LibraryGenreOverride.h>
 #include <Memory.h>
 
 #include <algorithm>
@@ -107,6 +108,7 @@ void LibraryActivity::prepareBookCard() {
   card.cover = rect(card.dialog.x + 16, card.dialog.y + 56, COVER_W, COVER_H);
   card.openButton = rect(card.dialog.x + 16, card.dialog.y + height - 56, width - 152, 40);
   card.closeButton = rect(card.dialog.x + width - 120, card.dialog.y + height - 56, 104, 40);
+  card.genreButton = rect(card.dialog.x + 144, card.dialog.y + 157, width - 160, 27);
   card.titleLines = renderer.wrappedText(library_shelf::FONT_BODY, card.book.title.c_str(), width - 160, 2);
   const char* description = card.description.empty() ? tr(STR_LIBRARY_CARD_NO_DESCRIPTION) : card.description.c_str();
   const int lineStep = renderer.getLineHeight(library_shelf::FONT_CARD) + 4;
@@ -152,6 +154,11 @@ void LibraryActivity::bindBookCard(const bool current) {
         LOG_ERR("LIB", "Cannot read optional book-card metadata");
       }
     }
+  }
+  if (library::genre_override::available()) {
+    const auto hash = library::clixPathHash(card.book.path.data(), card.book.path.size());
+    if (library::genre_override::read(hash, genreScratch) == library::genre_override::Result::Assigned)
+      card.genre.assign(genreScratch);
   }
   card.summary = false;
   card.current = current;
@@ -284,7 +291,18 @@ void LibraryActivity::drawBookCard() {
     y += 27;
   };
   if (SETTINGS.libraryShowSeries || card.summary) tag(card.series);
-  if (SETTINGS.libraryShowGenre) tag(card.genre);
+  if (card.summary) {
+    if (SETTINGS.libraryShowGenre) tag(card.genre);
+  } else {
+    const auto& button = card.genreButton;
+    renderer.drawRect(button.x, button.y, button.width, button.height);
+    drawBookLabel(SETTINGS.libraryShowGenre && !card.genre.empty() ? card.genre.c_str()
+                  : card.genre.empty()                             ? tr(STR_LIBRARY_ADD_GENRE)
+                                                                   : tr(STR_LIBRARY_CHANGE_GENRE),
+                  library_shelf::FONT_SMALL, button.x + 6, button.y + 5, button.width - 28);
+    renderer.drawLine(button.x + button.width - 17, button.y + 10, button.x + button.width - 12, button.y + 15);
+    renderer.drawLine(button.x + button.width - 12, button.y + 15, button.x + button.width - 7, button.y + 10);
+  }
   char progress[40];
   if (card.summary)
     snprintf(progress, sizeof(progress), tr(STR_LIBRARY_CARD_FINISHED), card.finished, card.total);
@@ -326,6 +344,7 @@ void LibraryActivity::handleBookCardInput(const LibraryInputBuffer::Event& input
   const auto target = [&] {
     return !card.summary && (contains(card.openButton, input.x, input.y) || contains(card.cover, input.x, input.y)) ? 1
            : contains(card.closeButton, input.x, input.y)                                                           ? 2
+           : !card.summary && contains(card.genreButton, input.x, input.y)                                          ? 3
                                                                                                                     : 0;
   };
   if (input.type == Type::TouchPress) {
@@ -337,7 +356,10 @@ void LibraryActivity::handleBookCardInput(const LibraryInputBuffer::Event& input
     return;
   }
   const bool open = input.type == Type::ConfirmRelease && !card.summary;
-  if (open || (input.type == Type::TouchRelease && target() == 1 && card.pressed == 1)) {
+  if ((input.type == Type::TouchRelease && target() == 3 && card.pressed == 3) || input.type == Type::Next ||
+      input.type == Type::Previous) {
+    if (!card.summary) openGenrePicker();
+  } else if (open || (input.type == Type::TouchRelease && target() == 1 && card.pressed == 1)) {
     bookCardActive = false;
     index.close();
     onSelectBook(card.book.path);

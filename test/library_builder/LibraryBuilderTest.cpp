@@ -11,6 +11,7 @@
 #include "Epub.h"
 #include "LibraryBuilder.h"
 #include "LibraryFileTypes.h"
+#include "LibraryGenreOverride.h"
 #include "LibraryIndexFile.h"
 #include "LibraryMetadataCache.h"
 #include "LibrarySort.h"
@@ -66,9 +67,9 @@ void dropMetadataCache() {
   Storage.remove(LibraryMetadataCache::payloadPath());
 }
 
-// Build a genuine V5 name section by removing each V6 position and updating
-// record offsets. Changing only the version byte would leave V6 blobs behind.
-bool downgradeIndexToVersionFive() {
+// Remove the newer blob suffixes as well as changing the version byte, so
+// migration tests use genuine older records rather than mislabeled V7 data.
+bool downgradeIndexToVersion(const uint8_t version) {
   auto& bytes = fake::files[INDEX]->bytes;
   ClixHeader header{};
   std::memcpy(&header, bytes.data(), sizeof(header));
@@ -83,13 +84,15 @@ bool downgradeIndexToVersionFive() {
       next = following.nameOff;
     }
     if (next < record.nameOff + sizeof(uint32_t) || next > header.nameLen) return false;
+    uint32_t positionAt = header.nameStart + record.nameOff + sizeof(uint64_t) + record.nameLen;
+    for (int field = 0; field < 5; ++field) positionAt += 1u + bytes[positionAt];
     const uint32_t newOffset = static_cast<uint32_t>(old.size() - header.nameStart);
     old.insert(old.end(), bytes.begin() + header.nameStart + record.nameOff,
-               bytes.begin() + header.nameStart + next - sizeof(uint32_t));
+               bytes.begin() + positionAt + (version >= 6 ? sizeof(uint32_t) : 0));
     record.nameOff = newOffset;
     std::memcpy(old.data() + recordOffset(header, i), &record, sizeof(record));
   }
-  header.formatVersion = 5;
+  header.formatVersion = version;
   header.nameLen = static_cast<uint32_t>(old.size() - header.nameStart);
   header.selfSize = static_cast<uint32_t>(old.size());
   std::memcpy(old.data(), &header, sizeof(header));
@@ -133,6 +136,92 @@ TEST_F(LibraryBuilderTest, UnchangedRebuildReusesMetadataAndDoesNotReplaceIndex)
   EXPECT_EQ(stats.metadataReused, 2);
   EXPECT_FALSE(stats.indexReplaced);
   EXPECT_EQ(fake::files[INDEX]->bytes, old);
+}
+
+TEST_F(LibraryBuilderTest, ManualGenreSurvivesCachedRebuildAndResetRestoresEmbeddedGenre) {
+  bookMetadata["/a.epub"].genre = "Fantasy";
+  bookMetadata["/a.epub"].series = "Existing Series";
+  initial();
+  const auto originalBook = fake::files["/a.epub"]->bytes;
+  const auto hash = clixPathHash("/a.epub", 7);
+  ASSERT_TRUE(genre_override::save(hash, "Psychology"));
+  fake::parses = 0;
+  ASSERT_TRUE(buildLibraryIndex("/", stats, true));
+  EXPECT_TRUE(stats.indexReplaced);
+  EXPECT_EQ(fake::parses, 0u);
+  const auto checkGenre = [&](const char* expected) {
+    LibraryIndexFile index;
+    ASSERT_TRUE(index.open(INDEX));
+    ClixRecord record{};
+    ASSERT_TRUE(recordAtPath(index, "/a.epub", record));
+    std::string genre, original, series;
+    ASSERT_TRUE(index.readGenre(record, genre));
+    ASSERT_TRUE(index.readSourceGenre(record, original));
+    ASSERT_TRUE(index.readSeries(record, series));
+    EXPECT_EQ(genre, expected);
+    EXPECT_EQ(original, "Fantasy");
+    EXPECT_EQ(series, "Existing Series");
+  };
+  checkGenre("Psychology");
+  ASSERT_TRUE(buildLibraryIndex("/", stats, true));
+  EXPECT_FALSE(stats.indexReplaced);
+  EXPECT_EQ(fake::parses, 0u);
+  checkGenre("Psychology");
+  ASSERT_TRUE(genre_override::save(hash, "", true));
+  ASSERT_TRUE(buildLibraryIndex("/", stats, true));
+  EXPECT_TRUE(stats.indexReplaced);
+  checkGenre("Fantasy");
+  EXPECT_EQ(fake::files["/a.epub"]->bytes, originalBook);
+  EXPECT_EQ(fake::parses, 0u);
+}
+
+TEST_F(LibraryBuilderTest, GenreOverrideAtomicFailureAndCorruptionKeepPreviousState) {
+  const auto hash = clixPathHash("/a.epub", 7);
+  ASSERT_TRUE(genre_override::save(hash, "History"));
+  std::string path;
+  for (const auto& entry : fake::files)
+    if (entry.first.starts_with(genre_override::DIRECTORY) && entry.first.ends_with(".lgr")) path = entry.first;
+  ASSERT_FALSE(path.empty());
+  fake::failRenameToPath = path;
+  EXPECT_FALSE(genre_override::save(hash, "Science"));
+  std::string genre;
+  EXPECT_EQ(genre_override::read(hash, genre), genre_override::Result::Assigned);
+  EXPECT_EQ(genre, "History");
+  // A power cut after backing up the old file must remain readable on reboot.
+  ASSERT_TRUE(Storage.rename(path.c_str(), (path + ".bak").c_str()));
+  EXPECT_EQ(genre_override::read(hash, genre), genre_override::Result::Assigned);
+  EXPECT_EQ(genre, "History");
+  ASSERT_TRUE(genre_override::save(hash, "Philosophy"));
+  initial();
+  const auto originalIndex = fake::files[INDEX]->bytes;
+  fake::files[path]->bytes[16] ^= 1;
+  EXPECT_EQ(genre_override::read(hash, genre), genre_override::Result::Error);
+  EXPECT_FALSE(buildLibraryIndex("/", stats, true));
+  EXPECT_EQ(fake::files[INDEX]->bytes, originalIndex);
+  EXPECT_FALSE(genre_override::save(hash, std::string(96, 'a')));
+  EXPECT_FALSE(genre_override::save(hash, " "));
+}
+
+TEST_F(LibraryBuilderTest, VersionSixUpgradeKeepsMetadataAndArrivalWithoutReparsing) {
+  bookMetadata["/a.epub"].genre = "Fantasy";
+  initial();
+  ASSERT_TRUE(downgradeIndexToVersion(6));
+  LibraryIndexFile old;
+  ASSERT_TRUE(old.openForReconciliation(INDEX));
+  ClixRecord before{};
+  ASSERT_TRUE(recordAtPath(old, "/a.epub", before));
+  old.close();
+  fake::parses = 0;
+  ASSERT_TRUE(buildLibraryIndex("/", stats, true));
+  EXPECT_EQ(fake::parses, 0u);
+  LibraryIndexFile updated;
+  ASSERT_TRUE(updated.open(INDEX));
+  ClixRecord after{};
+  ASSERT_TRUE(recordAtPath(updated, "/a.epub", after));
+  EXPECT_EQ(after.firstSeen, before.firstSeen);
+  std::string genre;
+  ASSERT_TRUE(updated.readSourceGenre(after, genre));
+  EXPECT_EQ(genre, "Fantasy");
 }
 
 TEST_F(LibraryBuilderTest, MissingModificationDateClearsDerivedCacheThroughStatePreservingPath) {
@@ -472,7 +561,7 @@ TEST_F(LibraryBuilderTest, VersionFiveIndexReparsesSeriesPositionsAndKeepsArriva
   ASSERT_TRUE(recordAtPath(before, "/a.epub", original));
   before.close();
 
-  ASSERT_TRUE(downgradeIndexToVersionFive());
+  ASSERT_TRUE(downgradeIndexToVersion(5));
   dropMetadataCache();
   fake::parses = 0;
   ASSERT_TRUE(buildLibraryIndex("/", stats, true));
@@ -492,7 +581,7 @@ TEST_F(LibraryBuilderTest, InterruptedUpgradeKeepsValidOldLiveIndexOverStaleBack
   ClixRecord original{};
   ASSERT_TRUE(recordAtPath(before, "/a.epub", original));
   before.close();
-  ASSERT_TRUE(downgradeIndexToVersionFive());
+  ASSERT_TRUE(downgradeIndexToVersion(5));
 
   constexpr char BACKUP[] = "/.crosspoint/library.bak";
   fake::files[BACKUP] = std::make_shared<fake::Node>(*fake::files[INDEX]);

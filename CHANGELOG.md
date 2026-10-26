@@ -2,6 +2,7 @@
 
 ### Added
 
+- Assign or restore a book's Library genre from its Book Card using common genres, existing Library genres or a custom name. Assignments persist on the SD card without modifying EPUBs or reading state, and existing series retain their books.
 - Show topic collections directly in the Series tab for books without Series metadata, with Unclassified for missing topics; existing series retain all their books.
 - Open an on-demand Book Card popup with the real EPUB description, cover, author, tags and saved progress; access current-reading and collection-summary cards without reducing shelf space.
 - Open Library to Series, Authors, and SD Folder collections with stacked cover thumbnails and an All Books shortcut.

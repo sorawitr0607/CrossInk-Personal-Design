@@ -95,9 +95,28 @@ struct ImageFolderIndexRecord {
 
 ## `/.crosspoint/library.idx`
 
-### Version 6
+### Version 7: source genres and local assignments
 
-Each book's name blob now ends with a `uint32_t` series position after the
+V7 appends a byte-length-prefixed original EPUB genre after the V6 series-position
+field. The existing genre field remains the effective Library genre, including a
+manual assignment. Header and record sizes and permutation locations are unchanged.
+V6 and older indexes treat their genre as the original value during reconciliation.
+Rebuilding V7 retains original metadata without reparsing unchanged EPUBs, and
+checks effective genres before taking the unchanged-index fast path.
+
+Manual choices live outside disposable reader caches, at
+`/.crosspoint/library-genres/<16-digit-clix-path-hash>.lgr`. Each record is exactly
+116 bytes: `LG01` (4), little-endian path hash (8), genre byte length (1), mode (1),
+reserved zero bytes (2), UTF-8 genre storage (96), and FNV-1a-32 of the first 112
+bytes (4). Mode 1 assigns a 1-95-byte label; mode 0 uses the book metadata. Records
+are validated before use; a corrupt assignment prevents replacing the previous
+index. Saving writes and syncs `.tmp`, renames the old record to `.bak`, then
+installs the new record. A missing live file can be read from `.bak` after a power
+cut. This changes Library organization without changing EPUB bytes or reader state.
+
+### Version 6: numeric series positions
+
+Each book's V6 name blob ends with a `uint32_t` series position after the
 length-prefixed genre. The value is a sortable encoding of a finite signed
 IEEE-754 single-precision number; `0xFFFFFFFF` means missing or invalid. Series
 sorting compares folded series name, then this position, then title order. Missing

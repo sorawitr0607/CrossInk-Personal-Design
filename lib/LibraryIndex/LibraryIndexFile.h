@@ -102,6 +102,9 @@ class LibraryIndexFile {
   bool readSourceAuthor(const ClixRecord& record, std::string& out);
   bool readSeries(const ClixRecord& record, std::string& out);
   bool readGenre(const ClixRecord& record, std::string& out);
+  // V7 retains the embedded value separately from the Library-only override.
+  // V3-V6 predate overrides, so their displayed genre is also the source genre.
+  bool readSourceGenre(const ClixRecord& record, std::string& out);
   // V6 sortable signed float bits; UINT32_MAX means no usable order.
   bool readSeriesPosition(const ClixRecord& record, uint32_t& out);
 

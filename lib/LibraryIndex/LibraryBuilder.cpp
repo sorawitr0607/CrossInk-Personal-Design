@@ -21,6 +21,7 @@
 
 #include "../../src/util/BookCacheUtils.h"
 #include "LibraryFileTypes.h"
+#include "LibraryGenreOverride.h"
 #include "LibraryIndexFile.h"
 #include "LibraryMetadataCache.h"
 #include "LibrarySort.h"
@@ -76,6 +77,8 @@ struct StagedEntry {
   char series[STAGE_METADATA_BYTES];
   uint8_t genreLen;
   char genre[STAGE_METADATA_BYTES];
+  uint8_t sourceGenreLen;
+  char sourceGenre[STAGE_METADATA_BYTES];
 };
 constexpr size_t STAGE_STRIDE = sizeof(StagedEntry);
 
@@ -527,6 +530,9 @@ struct WalkState {
   LibraryIndexFile* previous = nullptr;
   // Parses kept across cancelled or failed builds; null when metadata is off.
   LibraryMetadataCache* metadataCache = nullptr;
+  bool genreOverridesAvailable = false;
+  bool genresUnchanged = true;
+  std::string genreOverrideScratch;
   BuildStats* stats = nullptr;
   uint16_t enriched = 0;
   HalFile folders;  // folder section, staged separately then copied in
@@ -611,7 +617,7 @@ bool findPrior(WalkState& st, const uint64_t pathHash, uint32_t& position, uint1
       st.failed = true;
       return false;
     }
-    if (!st.previous->readSeries(priorRecord, series) || !st.previous->readGenre(priorRecord, genre)) {
+    if (!st.previous->readSeries(priorRecord, series) || !st.previous->readSourceGenre(priorRecord, genre)) {
       st.failed = true;
       return false;
     }
@@ -758,6 +764,25 @@ bool findPrior(WalkState& st, const uint64_t pathHash, uint32_t& position, uint1
       utf8SafeTruncateBuffer(series.data(), static_cast<int>(std::min(series.size(), STAGE_METADATA_BYTES))));
   if (entry.seriesLen > 0) memcpy(entry.series, series.data(), entry.seriesLen);
   if (entry.seriesLen == 0) entry.seriesPosition = CLIX_UNKNOWN_SERIES_POSITION;
+  entry.sourceGenreLen = static_cast<uint8_t>(
+      utf8SafeTruncateBuffer(genre.data(), static_cast<int>(std::min(genre.size(), STAGE_METADATA_BYTES))));
+  if (entry.sourceGenreLen > 0) memcpy(entry.sourceGenre, genre.data(), entry.sourceGenreLen);
+  if (st.genreOverridesAvailable) {
+    const auto result = genre_override::read(entry.pathHash, st.genreOverrideScratch);
+    if (result == genre_override::Result::Error) {
+      LOG_ERR("LIBIDX", "Cannot read genre assignment; retaining previous Library index");
+      st.failed = true;
+      return false;
+    }
+    if (result == genre_override::Result::Assigned) genre.assign(st.genreOverrideScratch);
+  }
+  if (st.genresUnchanged && priorFound && st.previous->header().formatVersion >= 7) {
+    if (!st.previous->readGenre(priorRecord, st.genreOverrideScratch)) {
+      st.failed = true;
+      return false;
+    }
+    st.genresUnchanged = genre == st.genreOverrideScratch;
+  }
   entry.genreLen = static_cast<uint8_t>(
       utf8SafeTruncateBuffer(genre.data(), static_cast<int>(std::min(genre.size(), STAGE_METADATA_BYTES))));
   if (entry.genreLen > 0) memcpy(entry.genre, genre.data(), entry.genreLen);
@@ -922,7 +947,8 @@ void walk(WalkState& st, const std::string& path, const int depth) {
 // truth.
 uint32_t blobBytesFor(const StagedEntry& entry, const uint8_t canonicalAuthorLen) {
   return sizeof(entry.pathHash) + entry.record.nameLen + 1u + canonicalAuthorLen + 1u + entry.titleLen + 1u +
-         entry.authorLen + 1u + entry.seriesLen + 1u + entry.genreLen + sizeof(entry.seriesPosition);
+         entry.authorLen + 1u + entry.seriesLen + 1u + entry.genreLen + sizeof(entry.seriesPosition) + 1u +
+         entry.sourceGenreLen;
 }
 
 uint64_t stageOffset(const uint16_t index) { return static_cast<uint64_t>(index) * STAGE_STRIDE; }
@@ -1474,6 +1500,8 @@ bool emitIndex(const char* folderStagePath, WalkState& st, BuildStats& stats) {
       put(&entry.genreLen, 1);
       if (entry.genreLen > 0) put(entry.genre, entry.genreLen);
       put(&entry.seriesPosition, sizeof(entry.seriesPosition));
+      put(&entry.sourceGenreLen, 1);
+      if (entry.sourceGenreLen > 0) put(entry.sourceGenre, entry.sourceGenreLen);
       blobWritten += blobBytesFor(entry, canonical.authorLen);
     }
   }
@@ -1725,6 +1753,8 @@ static bool rebuildLibraryIndex(const char* rootPath, BuildStats& stats, const b
   st.readMetadata = readMetadata;
   st.previous = previous.isOpen() ? &previous : nullptr;
   st.stats = &stats;
+  st.genreOverridesAvailable = genre_override::available();
+  if (st.genreOverridesAvailable) st.genreOverrideScratch.reserve(genre_override::MAX_BYTES);
   LibraryMetadataCache metadataCache;
   if (readMetadata) {
     metadataCache.open(&serviceSort, &buildCancelled);
@@ -1776,7 +1806,7 @@ static bool rebuildLibraryIndex(const char* rootPath, BuildStats& stats, const b
       previous.header().foldVersion == CLIX_FOLD_VERSION &&
       previous.header().metadataEnabled == static_cast<uint8_t>(readMetadata) && st.books == priorCount &&
       st.reused == priorCount && stats.metadataReused == priorCount && st.creationTimesUnchanged &&
-      st.unreadableSkipped == 0 && !st.dedupDegraded &&
+      st.genresUnchanged && st.unreadableSkipped == 0 && !st.dedupDegraded &&
       (previous.header().flags & (CLIX_FLAG_RANKS_DEGRADED | CLIX_FLAG_DEDUP_DEGRADED | CLIX_FLAG_ARRIVAL_DEGRADED)) ==
           0) {
     previous.close();

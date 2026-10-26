@@ -23,6 +23,21 @@ activity have no intentional behavior changes.
   grids work with every existing sort method, subject to that method's meaning:
   Recently Opened contains books already in the existing recent history.
 - Refresh, Search, Settings, Display, and Show Files remain available.
+- Tap the genre dropdown on a Book Card to assign one primary Library genre.
+  The picker offers twelve common genres, up to 32 other genres already in the
+  index, Add a genre for a custom name, and Use book's metadata to restore the
+  embedded value. Next/Previous on a book card also opens the picker on buttons.
+  Saving updates the index and topic tiles immediately; if the book leaves its
+  current topic, the parent returns to the collection tiles. Series always win.
+  These are Library-only assignments, saved as checked 116-byte records under
+  `/.crosspoint/library-genres/`, with temporary/backup replacement. EPUBs,
+  their hashes and reading state are unchanged. Keep this folder in SD backups;
+  assignments follow the book path, so moving/renaming a book needs reassignment.
+  Refresh, restarts, EPUB replacements at the same path and deleting the EPUB
+  rendering cache retain the assignment. Picker labels are allocated only for
+  the dialog; no new catalog or per-book string array stays resident in RAM.
+  Library index V7 retains the original source genre so Restore remains correct
+  after cached rebuilds. Older indexes upgrade without deleting reader caches.
 - Book view, grid dimensions, and shelf theme are Library-specific settings.
   Available grids are 2 x 2, 3 x 2, 2 x 3, 3 x 3, 4 x 2, 2 x 4 and 4 x 3;
   saved 3 x 4 and 4 x 4 choices migrate to 3 x 2. Shelf books have clear space
@@ -100,9 +115,9 @@ cppcheck, checks the shared code with a C3 build, then builds `x4-pro` and the
 native X4 Pro simulator. Simulator checks use generated books in a temporary
 card and capture actual one-bit Library output; no personal books are included.
 
-Successful runs provide the `crossink-1.6.1-library.6-x4-pro` artifact containing:
+Successful runs provide the `crossink-1.6.1-library.7-x4-pro` artifact containing:
 
-- `firmware-x4-pro-v1.6.1-library.6.bin`: the X4 Pro application image.
+- `firmware-x4-pro-v1.6.1-library.7.bin`: the X4 Pro application image.
 - `SHA256SUMS.txt` and `manifest.json`: integrity and build provenance.
 - `source.patch`: the exact patch against the pinned base, including formatting
   applied during the build.
