@@ -18,7 +18,7 @@ def fixture(path, number):
     title = f"{series}: Volume {number // 4 + 1:02}"
     author = ("Avery Stone", "Robin Reed", "Morgan Page")[number % 3] if number != 37 else ""
     creator = f"<dc:creator>{author}</dc:creator>" if author else ""
-    topic = {0: "Science Fiction", 32: "Science Fiction", 33: "Psychology", 34: "science fiction",
+    topic = {4: "Science Fiction", 32: "Science Fiction", 33: "Psychology", 34: "science fiction",
              35: "Garden Tales", 36: "", 37: "Psychology"}.get(number, "Fiction")
     series_metadata = (f'<meta name="calibre:series" content="{series}"/>'
                        f'<meta name="calibre:series_index" content="{number // 4 + 1}"/>') if number < 32 else ""
