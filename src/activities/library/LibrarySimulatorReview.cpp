@@ -485,7 +485,7 @@ void LibraryActivity::runSimulatorLibraryReview() {
                                                            choices.selected, false, true);
   check(picker != nullptr, "Genre picker allocation");
   picker->onEnter();
-  picker->render(RenderLock(nullptr));
+  picker->render(std::move(reviewLock));
   saveImage("genre-picker");
   picker->onExit();
   picker.reset();
