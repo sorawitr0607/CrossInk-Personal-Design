@@ -86,7 +86,7 @@ void LibraryActivity::runSimulatorLibraryReview() {
   int unknownAuthor = -1;
   for (int group = 0; group < collectionCount; ++group) {
     library::ClixRecord record{};
-    if (index.readRecord(collections[group].leader, record) &&
+    if (index.readRecord(collections[group].leaderOrdinal(), record) &&
         readCollectionValue(record, CollectionKind::Authors, collectionScratch) && collectionScratch.empty())
       unknownAuthor = group;
   }
@@ -139,6 +139,57 @@ void LibraryActivity::runSimulatorLibraryReview() {
     saveImage(name);
   };
   char name[80];
+  enterCollections(CollectionKind::Series);
+  int scienceTopic = -1, unclassified = -1, gardenSeries = -1, gardenTopic = -1;
+  int collectionBooks = 0;
+  for (int group = 0; group < collectionCount; ++group) {
+    collectionBooks += collections[group].count;
+    check(collectionLabel(collections[group], collectionScratch), "Read series/topic tile label");
+    library::foldInto(collectionScratch, groupKeyScratch);
+    if (collections[group].isTopic()) {
+      if (groupKeyScratch == "science fiction") scienceTopic = group;
+      if (collectionScratch == tr(STR_LIBRARY_UNCLASSIFIED)) unclassified = group;
+      if (groupKeyScratch == "garden tales") gardenTopic = group;
+    } else if (groupKeyScratch == "garden tales") {
+      gardenSeries = group;
+    }
+  }
+  check(collectionBooks == rowCount(), "Every visible book belongs to exactly one series or topic tile");
+  check(scienceTopic >= 0 && collections[scienceTopic].count == 2,
+        "Case-folded topics group non-series books directly and exclude same-genre series books");
+  check(gardenSeries >= 0 && gardenTopic >= 0, "A same-named topic and series remain distinct collections");
+  check(unclassified >= 0 && collections[unclassified].count == 2,
+        "Missing topics use Unclassified directly, including the ordinary TXT book");
+  enterCollection(scienceTopic);
+  for (const auto method :
+       {Sort::DateAdded, Sort::Title, Sort::AuthorLast, Sort::AuthorFirst, Sort::Series, Sort::Genre}) {
+    sort = method;
+    descending = false;
+    applyFilter();
+    check(collectionScope == CollectionKind::Topics && rowCount() == 2, "Sorting retains topic membership");
+    for (int row = 0; row < rowCount(); ++row) {
+      library::ClixRecord record{};
+      check(index.readRecord(ordinalForRow(row), record) && index.readSeries(record, seriesScratch) &&
+                seriesScratch.empty(),
+            "Topic collections never contain a series book");
+    }
+  }
+  capture("inside-topic");
+  enterCollections(CollectionKind::Series);
+  SETTINGS.libraryHideFinishedBooks = true;
+  applyFilter();
+  buildCollections();
+  collectionBooks = 0;
+  for (int group = 0; group < collectionCount; ++group) collectionBooks += collections[group].count;
+  check(collectionBooks == rowCount(), "Hide Finished agrees with both series and topic counts");
+  SETTINGS.libraryHideFinishedBooks = false;
+  SETTINGS.libraryShowTxt = false;
+  applyFilter();
+  buildCollections();
+  for (int group = 0; group < collectionCount; ++group)
+    if (collectionLabel(collections[group], collectionScratch) && collectionScratch == tr(STR_LIBRARY_UNCLASSIFIED))
+      check(collections[group].count == 1, "Topic grouping respects file-type visibility");
+  SETTINGS.libraryShowTxt = true;
   for (const auto theme : library_shelf::THEME_IDS) {
     SETTINGS.libraryBookshelfTheme = theme;
     SETTINGS.libraryBackground = library_shelf::Illustrated;
@@ -233,6 +284,10 @@ void LibraryActivity::runSimulatorLibraryReview() {
         resetViewport();
         snprintf(name, sizeof(name), "theme-%u-shelf-2x2", theme);
         capture(name);
+        moveBookPage(1);
+        snprintf(name, sizeof(name), "theme-%u-shelf-2x2-page-2", theme);
+        capture(name);
+        moveBookPage(-2);
         std::printf("LIBRARY SIZE REVIEW: theme %u 2x2 %dx%d\n", theme, gridCoverWidth, gridCoverHeight);
         SETTINGS.libraryGridColumns = 3;
         resetViewport();
@@ -262,10 +317,8 @@ void LibraryActivity::runSimulatorLibraryReview() {
           const auto layout =
               library_shelf::shelfGeometry(pageCacheWidth, pageCacheHeight, 2, preset.rows, SETTINGS.libraryOrnaments);
           const int areaLeft = (renderer.getScreenWidth() - pageCacheWidth) / 2;
-          const int leftGap = left - areaLeft - layout.endInset;
-          const int rightGap = areaLeft + pageCacheWidth - layout.ornamentWidth - layout.endInset - right;
-          check(leftGap >= 0 && rightGap >= 0 && std::abs(leftGap - rightGap) <= 1,
-                "Tall two-column books are balanced and stay clear of shelf ends");
+          check(left >= areaLeft + layout.endInset && right <= areaLeft + pageCacheWidth - layout.endInset,
+                "Varied tall two-column books stay clear of both shelf ends");
         }
       }
     }

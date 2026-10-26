@@ -9,7 +9,6 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
-#include <iterator>
 
 #include "LibraryActivity.h"
 #include "LibraryFonts.h"
@@ -293,20 +292,23 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
   library_shelf::ShelfCursor cursor{};
   visibleBookCount = 0;
   const int rowHeight = SETTINGS.libraryListExpanded ? 84 : 62;
-  // A bounded, metadata-free preview of each short shelf's occupied width lets
-  // tall two-column layouts center their books instead of piling them left.
-  int shelfOffsets[4]{};
-  if (shelf && geometry.columns == 2 && geometry.rows >= 3) {
+  // Preview cached status bits only: stable book groups and left/right/interior
+  // keepsakes, with no extra metadata reads, images, heap or display refreshes.
+  library_shelf::ShelfArrangement arrangements[4]{};
+  const uint32_t collectionSeed =
+      static_cast<uint32_t>(library::clixPathHash(collectionKey.data(), collectionKey.size()));
+  if (shelf) {
     library_shelf::ShelfCursor preview{};
     for (int row = gridPageStart; row < pageEnd; ++row) {
       const bool done = !pageCacheFallback && rowCompletion && (rowCompletion[row / 8] & (1u << (row % 8)));
       library_shelf::Placement placed{};
       if (!library_shelf::place(preview, geometry, area.width, GAP, done, placed, static_cast<uint32_t>(row))) break;
-      shelfOffsets[placed.line] = std::max(shelfOffsets[placed.line], placed.x + placed.width);
+      arrangements[placed.line].usedWidth = placed.x + placed.width - geometry.endInset;
+      ++arrangements[placed.line].count;
     }
-    std::transform(std::begin(shelfOffsets), std::end(shelfOffsets), std::begin(shelfOffsets), [&](const int used) {
-      return std::max(0, (area.width - geometry.ornamentWidth - geometry.endInset - used) / 2);
-    });
+    for (int line = 0; line < geometry.rows; ++line)
+      library_shelf::arrangeShelf(arrangements[line], geometry, area.width,
+                                  library_shelf::shelfSeed(collectionSeed, bookPageIndex, geometry.rows, line));
   }
   if (!list) {
     for (int line = 0; line < geometry.rows; ++line) {
@@ -314,6 +316,7 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
       library_shelf::drawPlank(renderer, SETTINGS.libraryBookshelfTheme, area.x + 4, floor, area.width - 8, false);
     }
   }
+  int linePosition = 0, previousLine = -1;
   for (int row = gridPageStart; row < pageEnd && visibleBookCount < library_shelf::MAX_VISIBLE_BOOKS; ++row) {
     const bool done = !pageCacheFallback && rowCompletion && (rowCompletion[row / 8] & (1u << (row % 8)));
     const bool spine = shelf && done && !pageCacheFallback;
@@ -321,12 +324,14 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
     if (!list && !library_shelf::place(cursor, geometry, area.width, GAP, spine, placement, static_cast<uint32_t>(row)))
       break;
     const int slot = visibleBookCount++;
+    if (placement.line != previousLine) linePosition = 0;
+    previousLine = placement.line;
     const int floor =
         list ? area.y + slot * rowHeight + 49
              : area.y + (placement.line + 1) * geometry.cellHeight + placement.line * GAP - labelHeight - plankSpace;
-    const int x = list ? area.x + 8
-                       : area.x + placement.x + shelfOffsets[placement.line] +
-                             (placement.width - (spine ? placement.width : coverWidth)) / 2;
+    const int placedX =
+        shelf ? library_shelf::arrangedBookX(arrangements[placement.line], placement, linePosition++) : placement.x;
+    const int x = list ? area.x + 8 : area.x + placedX + (placement.width - (spine ? placement.width : coverWidth)) / 2;
     const int itemHeight = spine ? placement.height : coverHeight;
     const int y = floor - itemHeight;
     const int width = spine ? placement.width : coverWidth;
@@ -450,10 +455,12 @@ void LibraryActivity::buildGrid(UiApp::ScreenType& screen) {
       for (int i = 0; i < visibleBookCount; ++i)
         if (bookCells[i].line == line) used = std::max<int>(used, bookCells[i].x + bookCells[i].width - area.x + GAP);
       if (SETTINGS.libraryOrnaments) {
-        library_shelf::drawOrnament(renderer, SETTINGS.libraryBookshelfTheme, 0, line + bookPageIndex,
-                                    area.x + used + 4, floor, area.width - used - geometry.endInset,
-                                    geometry.coverHeight);
-        if (used == 0)
+        const auto seed = library_shelf::shelfSeed(collectionSeed, bookPageIndex, geometry.rows, line);
+        const auto& arrangement = arrangements[line];
+        library_shelf::drawOrnament(
+            renderer, SETTINGS.libraryBookshelfTheme, 0, seed, area.x + (shelf ? arrangement.ornamentX : used) + 4,
+            floor, shelf ? arrangement.ornamentWidth - 8 : area.width - used - geometry.endInset, geometry.coverHeight);
+        if (used == 0 && !shelf)
           library_shelf::drawOrnament(renderer, SETTINGS.libraryBookshelfTheme, 1, line, area.x + 10, floor - 24,
                                       std::min<int>(120, area.width / 3), geometry.coverHeight - 24);
         if (visibleBookCount > 0 && line == 0) {

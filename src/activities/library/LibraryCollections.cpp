@@ -38,6 +38,12 @@ bool LibraryActivity::readCollectionValue(const library::ClixRecord& record, con
                                           std::string& value) {
   value.clear();
   if (kind == CollectionKind::Series) return index.readSeries(record, value);
+  if (kind == CollectionKind::Topics) {
+    if (!index.readSeries(record, seriesScratch)) return false;
+    // Series membership always wins. A subject must never pull a series book
+    // into the topic collection for otherwise unassigned books.
+    return !seriesScratch.empty() || index.readGenre(record, value);
+  }
   // An empty author is valid metadata, not an I/O failure. Keep its books in
   // Unknown Author instead of discarding every collection built so far.
   if (kind == CollectionKind::Authors) return index.readAuthor(record, value) || !index.ioFailed();
@@ -58,6 +64,7 @@ bool LibraryActivity::matchesCollection(const library::ClixRecord& record) {
     filterFailed = true;
     return false;
   }
+  if (collectionScope == CollectionKind::Topics && !seriesScratch.empty()) return false;
   if (collectionScope == CollectionKind::Folders) return collectionScratch == collectionKey;
   library::foldInto(collectionScratch, groupKeyScratch);
   return groupKeyScratch == collectionKey;
@@ -73,10 +80,12 @@ bool LibraryActivity::readIndexedBook(const uint16_t ordinal, RecentBook& book) 
 
 bool LibraryActivity::collectionLabel(const CollectionSlot& slot, std::string& value) {
   library::ClixRecord record{};
-  if (!index.readRecord(slot.leader, record) || !readCollectionValue(record, collectionTab, value)) return false;
+  if (!index.readRecord(slot.leaderOrdinal(), record) ||
+      !readCollectionValue(record, slot.isTopic() ? CollectionKind::Topics : collectionTab, value))
+    return false;
   if (value.empty()) {
     value.assign(collectionTab == CollectionKind::Authors ? tr(STR_LIBRARY_UNKNOWN_AUTHOR)
-                                                          : tr(STR_LIBRARY_STANDALONE));
+                                                          : tr(STR_LIBRARY_UNCLASSIFIED));
   } else if (collectionTab == CollectionKind::Folders && value != "/") {
     if (value.front() == '/') value.erase(0, 1);
   }
@@ -109,6 +118,7 @@ void LibraryActivity::buildCollections() {
   const int books = rowCount();
   previousGroupKeyScratch.clear();
   bool haveGroup = false;
+  bool haveTopics = false;
   for (int row = 0; row < books; ++row) {
     if ((row & 31) == 31) delay(1);
     const auto ordinal = ordinalForRow(row);
@@ -132,6 +142,10 @@ void LibraryActivity::buildCollections() {
         collectionsFailed = true;
         break;
       }
+      if (collectionTab == CollectionKind::Series && collectionScratch.empty()) {
+        haveTopics = true;
+        continue;
+      }
       library::foldInto(collectionScratch, groupKeyScratch);
       if (!haveGroup || groupKeyScratch != previousGroupKeyScratch) {
         if (collectionCount >= collectionCapacity) {
@@ -149,6 +163,48 @@ void LibraryActivity::buildCollections() {
     if (slot.count < COVERS_PER_COLLECTION) slot.covers[slot.count] = ordinal;
     ++slot.count;
     if (completed) ++slot.completed;
+  }
+  // Series are already contiguous in Series order. Stream the existing Genre
+  // permutation for non-series books, so topics are contiguous too: two linear
+  // passes, the same 12-byte slots, no new sort, per-book strings or heap array.
+  // Landing-page search opens All Books, so its only filters are file type and
+  // Hide Finished, both respected below. Completion reads reuse the first pass.
+  if (haveTopics && !collectionsFailed) {
+    haveGroup = false;
+    previousGroupKeyScratch.clear();
+    const auto visibleTypes = visibleLibraryFileTypes();
+    for (uint16_t row = 0; row < index.bookCount(); ++row) {
+      if ((row & 31) == 31) delay(1);
+      const auto ordinal = index.ordinalForRow(library::SortOrder::GenreAsc, row);
+      library::ClixRecord record{};
+      if (ordinal == UINT16_MAX || !index.readRecord(ordinal, record) || !index.readSeries(record, seriesScratch)) {
+        collectionsFailed = true;
+        break;
+      }
+      if (!seriesScratch.empty()) continue;
+      if (!index.readName(record, rowScratch.path) || !index.readGenre(record, collectionScratch)) {
+        collectionsFailed = true;
+        break;
+      }
+      if ((library::fileTypeFor(rowScratch.path) & visibleTypes) == 0) continue;
+      const bool completed = completedOrdinal(ordinal);
+      if (SETTINGS.libraryHideFinishedBooks && completed) continue;
+      library::foldInto(collectionScratch, groupKeyScratch);
+      if (!haveGroup || groupKeyScratch != previousGroupKeyScratch) {
+        if (collectionCount >= collectionCapacity) {
+          collectionsFailed = true;
+          break;
+        }
+        previousGroupKeyScratch.assign(groupKeyScratch);
+        haveGroup = true;
+        ++collectionCount;
+      }
+      auto& slot = collections[collectionCount - 1];
+      if (slot.count == 0) slot.leader = ordinal | 0x8000;
+      if (slot.count < COVERS_PER_COLLECTION) slot.covers[slot.count] = ordinal;
+      ++slot.count;
+      if (completed) ++slot.completed;
+    }
   }
   if (collectionTab == CollectionKind::Folders) {
     for (uint32_t i = 0; i < collectionCapacity; ++i) {
@@ -188,13 +244,13 @@ void LibraryActivity::enterCollection(const int slot) {
   collectionTitle.clear();
   if (slot >= 0) {
     library::ClixRecord record{};
-    if (!index.readRecord(collections[slot].leader, record) ||
-        !readCollectionValue(record, collectionTab, collectionKey) ||
-        !collectionLabel(collections[slot], collectionTitle)) {
+    const auto kind = collections[slot].isTopic() ? CollectionKind::Topics : collectionTab;
+    if (!index.readRecord(collections[slot].leaderOrdinal(), record) ||
+        !readCollectionValue(record, kind, collectionKey) || !collectionLabel(collections[slot], collectionTitle)) {
       LOG_ERR("LIB", "Cannot open collection");
       return;
     }
-    collectionScope = collectionTab;
+    collectionScope = kind;
     if (collectionScope != CollectionKind::Folders) {
       library::foldInto(collectionKey, groupKeyScratch);
       collectionKey.assign(groupKeyScratch);

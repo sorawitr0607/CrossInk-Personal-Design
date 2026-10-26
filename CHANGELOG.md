@@ -2,6 +2,7 @@
 
 ### Added
 
+- Show topic collections directly in the Series tab for books without Series metadata, with Unclassified for missing topics; existing series retain all their books.
 - Open an on-demand Book Card popup with the real EPUB description, cover, author, tags and saved progress; access current-reading and collection-summary cards without reducing shelf space.
 - Open Library to Series, Authors, and SD Folder collections with stacked cover thumbnails and an All Books shortcut.
 - Choose a Library-only book grid from seven presets, plus Shelf, Covers and List views for every sort.
@@ -18,6 +19,7 @@
 
 ### Changed
 
+- Give Shelf pages stable, varied book-group spacing and left, right or interior ornaments while preserving sort order, Finished spines and shelf-end margins.
 - Soften Autumn wallpaper and clear its label panels; add shaded, dimensional finished-book spines and clearance at shelf ends.
 - Enlarge Book Card descriptions with clearer line spacing; open collection summaries from the header title and remove the book hint strip.
 - Center tall two-column shelf arrangements; remove 3 x 4 and 4 x 4 grid choices and migrate those saved sizes to 3 x 2.

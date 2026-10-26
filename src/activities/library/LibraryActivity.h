@@ -45,12 +45,16 @@ class LibraryActivity final : public Activity {
 
  private:
   enum class Sort : uint8_t { DateAdded, Title, AuthorLast, AuthorFirst, RecentlyRead, Series, Genre };
-  enum class CollectionKind : uint8_t { All, Series, Authors, Folders };
+  enum class CollectionKind : uint8_t { All, Series, Authors, Folders, Topics };
   struct CollectionSlot {
     uint16_t leader = 0;
     uint16_t count = 0;
     uint16_t completed = 0;
     uint16_t covers[3]{};
+    // Ordinals are below 32767; use the spare bit to distinguish a topic from
+    // a same-named series without increasing the per-collection allocation.
+    uint16_t leaderOrdinal() const { return leader & 0x7fff; }
+    bool isTopic() const { return (leader & 0x8000) != 0; }
   };
   static_assert(sizeof(CollectionSlot) == 12, "Collection cache holds references, not book metadata");
   // One 12-byte slot per potential group, held in PSRAM through the existing
@@ -257,6 +261,7 @@ class LibraryActivity final : public Activity {
   static void onScanProgress(void* context, const library::BuildProgress& progress);
   void readRecentBook(size_t historyRow, RecentBook& book) const;
   void resolveRecents();
+  static uint8_t visibleLibraryFileTypes();
   void applyFilter();
   void resetViewport();
   void reloadAfterBookAction();

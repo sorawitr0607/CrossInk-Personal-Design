@@ -214,6 +214,7 @@ void LibraryActivity::showSummaryCard() {
   card.series = collectionScope == CollectionKind::All       ? tr(STR_LIBRARY_ALL_BOOKS)
                 : collectionScope == CollectionKind::Authors ? tr(STR_LIBRARY_AUTHORS)
                 : collectionScope == CollectionKind::Folders ? tr(STR_LIBRARY_SD_FOLDERS)
+                : collectionScope == CollectionKind::Topics  ? tr(STR_LIBRARY_GENRE)
                                                              : tr(STR_LIBRARY_SERIES);
   card.percent = card.total > 0 ? 100.0f * card.finished / card.total : 0;
   card.previewCount = std::min(3, card.total);

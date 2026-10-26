@@ -15,6 +15,10 @@ activity have no intentional behavior changes.
   a theme nameplate, and counts from the existing reading statistics.
 - Series and Authors use the existing Library metadata. The SD Folders tab lists
   directories containing indexed books. It does not move files or replace Files.
+- Series metadata takes priority. Books without a series appear directly in topic
+  tiles in the Series tab, using the first EPUB subject as their topic; missing
+  subjects appear under Unclassified. Topic and series names cannot merge their
+  memberships. Refresh after updating EPUB metadata to move a book into its series.
 - Collection and All Books screens start with Series ascending sorting. Cover
   grids work with every existing sort method, subject to that method's meaning:
   Recently Opened contains books already in the existing recent history.
@@ -22,7 +26,7 @@ activity have no intentional behavior changes.
 - Book view, grid dimensions, and shelf theme are Library-specific settings.
   Available grids are 2 x 2, 3 x 2, 2 x 3, 3 x 3, 4 x 2, 2 x 4 and 4 x 3;
   saved 3 x 4 and 4 x 4 choices migrate to 3 x 2. Shelf books have clear space
-  at both plank ends; tall two-column shelves center the book group. Finished
+  at both plank ends; shelf groups vary their alignment and spacing. Finished
   spines have shaded bindings, raised bands and inset title panels. Autumn
   wallpaper is lighter, with clear label panels. The book hint strip is removed.
   Grid size appears in Shelf and Covers; List density appears in List. Show
@@ -56,7 +60,14 @@ activity have no intentional behavior changes.
   invalidates the cached card so replacing an EPUB at the same path reloads its
   metadata. Paragraphs and line breaks retain word spacing in descriptions. Descriptions
   use a larger 10-point Library bitmap font, left alignment and extra line spacing.
-- Tall two-column shelves use larger covers and center their book groups.
+- Shelf arrangements are stable when revisiting a page. Ornaments cycle through
+  fitting artwork across pages and can sit left, right or between book groups.
+  Decorative offsets do not change pagination, book order or completion status.
+  Four fixed row plans use 112 bytes of stack, with no new heap allocation,
+  bitmap assets, background task or display refresh. Topic grouping streams the
+  existing Series and Genre permutations in two linear passes when needed,
+  reusing 12-byte collection slots and the completion cache.
+- Tall two-column shelves use larger covers and distribute their book groups.
   Collections open with one tap. First, previous, next and last page controls remain available.
 
 The collection cache holds compact book references using the existing
@@ -89,9 +100,9 @@ cppcheck, checks the shared code with a C3 build, then builds `x4-pro` and the
 native X4 Pro simulator. Simulator checks use generated books in a temporary
 card and capture actual one-bit Library output; no personal books are included.
 
-Successful runs provide the `crossink-1.6.1-library.5-x4-pro` artifact containing:
+Successful runs provide the `crossink-1.6.1-library.6-x4-pro` artifact containing:
 
-- `firmware-x4-pro-v1.6.1-library.5.bin`: the X4 Pro application image.
+- `firmware-x4-pro-v1.6.1-library.6.bin`: the X4 Pro application image.
 - `SHA256SUMS.txt` and `manifest.json`: integrity and build provenance.
 - `source.patch`: the exact patch against the pinned base, including formatting
   applied during the build.

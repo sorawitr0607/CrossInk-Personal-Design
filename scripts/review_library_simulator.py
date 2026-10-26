@@ -18,6 +18,10 @@ def fixture(path, number):
     title = f"{series}: Volume {number // 4 + 1:02}"
     author = ("Avery Stone", "Robin Reed", "Morgan Page")[number % 3] if number != 37 else ""
     creator = f"<dc:creator>{author}</dc:creator>" if author else ""
+    topic = {0: "Science Fiction", 32: "Science Fiction", 33: "Psychology", 34: "science fiction",
+             35: "Garden Tales", 36: "", 37: "Psychology"}.get(number, "Fiction")
+    series_metadata = (f'<meta name="calibre:series" content="{series}"/>'
+                       f'<meta name="calibre:series_index" content="{number // 4 + 1}"/>') if number < 32 else ""
     image = Image.new("1", (150, 225), number % 2 == 0)
     ink = int(number % 2 != 0)
     draw = ImageDraw.Draw(image)
@@ -35,9 +39,9 @@ def fixture(path, number):
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id">
 <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
 <dc:identifier id="id">crossink-library-review-{number}</dc:identifier><dc:title>{escape(title)}</dc:title>
-{creator}<dc:language>en</dc:language><dc:subject>Fiction</dc:subject>
+{creator}<dc:language>en</dc:language><dc:subject>{topic}</dc:subject>
 <dc:description><![CDATA[<p>A gentle <b>garden adventure</b>, shared with friends &amp; family.</p><p>First paragraph.</p><p>Second paragraph.</p><div>Quiet <i>friend</i>ship.</div><BR/>A cozy ending.]]></dc:description>
-<meta name="calibre:series" content="{series}"/><meta name="calibre:series_index" content="{number // 4 + 1}"/>
+{series_metadata}
 <meta name="cover" content="cover"/><meta property="dcterms:modified">2026-01-01T00:00:00Z</meta></metadata>
 <manifest><item id="cover" href="cover.png" media-type="image/png" properties="cover-image"/>
 <item id="chapter" href="chapter.xhtml" media-type="application/xhtml+xml"/>

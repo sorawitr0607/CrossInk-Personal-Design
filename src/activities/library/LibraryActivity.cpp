@@ -49,11 +49,6 @@ constexpr int HEADER_CONTROL_SIZE = 44;
 constexpr int HEADER_CONTROL_GAP = 10;
 constexpr int FOOTER_HEIGHT = 28;
 
-uint8_t visibleLibraryFileTypes() {
-  return (SETTINGS.libraryShowEpub ? library::FileEpub : 0) | (SETTINGS.libraryShowXtc ? library::FileXtc : 0) |
-         (SETTINGS.libraryShowTxt ? library::FileTxt : 0) | (SETTINGS.libraryShowMarkdown ? library::FileMarkdown : 0);
-}
-
 const RecentBook* recentBookForPath(const std::string& path) {
   const auto& books = RECENT_BOOKS.getBooks();
   const auto it =
@@ -77,6 +72,11 @@ int headerControlRightInset() {
   return metrics.headerBatteryDetached || metrics.headerBatterySide == 1 ? 10 : metrics.batteryWidth + 80;
 }
 }  // namespace
+
+uint8_t LibraryActivity::visibleLibraryFileTypes() {
+  return (SETTINGS.libraryShowEpub ? library::FileEpub : 0) | (SETTINGS.libraryShowXtc ? library::FileXtc : 0) |
+         (SETTINGS.libraryShowTxt ? library::FileTxt : 0) | (SETTINGS.libraryShowMarkdown ? library::FileMarkdown : 0);
+}
 
 LibraryActivity::LibraryActivity(GfxRenderer& renderer, MappedInputManager& mappedInput)
     : Activity("Library", renderer, mappedInput),

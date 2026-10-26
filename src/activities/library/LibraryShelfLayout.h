@@ -118,4 +118,39 @@ inline bool place(ShelfCursor& cursor, const Geometry& geometry, const int width
   return true;
 }
 
+// Decorative offsets are applied after packing, so page boundaries and book
+// order never depend on the ornaments. Four plans use 112 bytes on the stack.
+struct ShelfArrangement {
+  int usedWidth = 0, count = 0;
+  int offset = 0, spacing = 0, split = 0, ornamentX = 0, ornamentWidth = 0;
+};
+constexpr uint32_t shelfSeed(const uint32_t collection, const unsigned page, const int rowCount, const int line) {
+  return collection + page * static_cast<unsigned>(rowCount) + static_cast<unsigned>(line);
+}
+inline void arrangeShelf(ShelfArrangement& plan, const Geometry& geometry, const int width, uint32_t seed) {
+  const int position = static_cast<int>(seed % 3);
+  // Mix only the arrangement; the unmixed shelf sequence cycles through all
+  // fitting ornaments instead of repeating at the next page's first row.
+  seed ^= seed >> 16;
+  seed *= 0x7feb352du;
+  seed ^= seed >> 15;
+  const int reserve = geometry.ornamentWidth;
+  int slack = width - 2 * geometry.endInset - plan.usedWidth - reserve;
+  if (slack < 0) slack = 0;
+  plan.spacing = plan.count > 1 ? smaller(static_cast<int>((seed >> 12) % 3), slack / (plan.count - 1)) : 0;
+  slack -= plan.spacing * (plan.count > 0 ? plan.count - 1 : 0);
+  plan.offset = slack * (1 + static_cast<int>((seed >> 8) % 3)) / 4;
+  plan.split = reserve == 0 || position == 1     ? plan.count
+               : position == 0 || plan.count < 2 ? 0
+                                                 : 1 + static_cast<int>((seed >> 4) % (plan.count - 1));
+  plan.ornamentWidth = reserve;
+  plan.ornamentX =
+      geometry.endInset + plan.offset + plan.usedWidth + plan.spacing * (plan.count > 0 ? plan.count - 1 : 0);
+}
+inline int arrangedBookX(ShelfArrangement& plan, const Placement& placement, const int position) {
+  const int x = placement.x + plan.offset + plan.spacing * position;
+  if (position == plan.split) plan.ornamentX = x;
+  return x + (position >= plan.split ? plan.ornamentWidth : 0);
+}
+
 }  // namespace library_shelf

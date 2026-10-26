@@ -47,6 +47,66 @@ int main() {
   const auto tall = geometry(446, 550, 2, 3, 8, 6, 30);
   check(wide.cellWidth < tall.cellWidth && wide.cellHeight > tall.cellHeight,
         "3 x 2 and 2 x 3 are visibly different layouts");
+  check(shelfSeed(0, 0, 2, 1) != shelfSeed(0, 1, 2, 0),
+        "The second shelf and next page's first shelf have different decoration seeds");
+  bool leftOrnament = false, rightOrnament = false, middleOrnament = false;
+  for (const auto preset : GRID_PRESETS) {
+    for (const bool ornaments : {false, true}) {
+      const auto layout = shelfGeometry(432, 550, preset.columns, preset.rows, ornaments);
+      for (unsigned page = 0; page < 24; ++page) {
+        ShelfCursor cursor{};
+        Placement placed[MAX_VISIBLE_BOOKS]{};
+        ShelfArrangement plans[4]{};
+        int count = 0;
+        while (count < MAX_VISIBLE_BOOKS && place(cursor, layout, 432, 8, count % 3 == 0, placed[count], count)) {
+          auto& plan = plans[placed[count].line];
+          plan.usedWidth = placed[count].x + placed[count].width - layout.endInset;
+          ++plan.count;
+          ++count;
+        }
+        for (int line = 0; line < layout.rows; ++line) {
+          auto& plan = plans[line];
+          auto again = plan;
+          const auto seed = shelfSeed(123, page, layout.rows, line);
+          arrangeShelf(plan, layout, 432, seed);
+          arrangeShelf(again, layout, 432, seed);
+          check(plan.offset == again.offset && plan.split == again.split && plan.spacing == again.spacing,
+                "A page keeps the same arrangement on every repaint");
+          if (ornaments && plan.count > 1) {
+            leftOrnament |= plan.split == 0;
+            rightOrnament |= plan.split == plan.count;
+            middleOrnament |= plan.split > 0 && plan.split < plan.count;
+          }
+        }
+        int position = 0, previousLine = -1, right = 0;
+        for (int i = 0; i < count; ++i) {
+          const auto& item = placed[i];
+          if (item.line != previousLine) position = 0;
+          const int x = arrangedBookX(plans[item.line], item, position++);
+          check(x >= layout.endInset && x + item.width <= 432 - layout.endInset,
+                "Every arrangement retains both shelf-end margins");
+          if (item.line == previousLine) check(x >= right + 1, "Variation preserves sorted order without overlap");
+          previousLine = item.line;
+          right = x + item.width;
+        }
+        for (int i = 0; i < count; ++i) {
+          auto plan = plans[placed[i].line];
+          const int positionInLine = [&] {
+            int n = 0;
+            for (int j = 0; j < i; ++j)
+              if (placed[j].line == placed[i].line) ++n;
+            return n;
+          }();
+          const int x = arrangedBookX(plan, placed[i], positionInLine);
+          check(plan.ornamentWidth == 0 || x + placed[i].width <= plan.ornamentX ||
+                    x >= plan.ornamentX + plan.ornamentWidth,
+                "Decorations never cover a book");
+          check(plan.ornamentX + plan.ornamentWidth <= 432 - layout.endInset, "Decorations stay within the shelf ends");
+        }
+      }
+    }
+  }
+  check(leftOrnament && rightOrnament && middleOrnament, "Shelf pages use left, right and interior decorations");
   // Reproduce full-library paging with mixed statuses; every source row must
   // appear exactly once, within bounds, with no page exceeding the hit budget.
   for (const auto preset : GRID_PRESETS) {
