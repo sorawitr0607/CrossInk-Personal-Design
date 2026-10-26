@@ -4,6 +4,7 @@
 #include <Epub.h>
 #include <FsHelpers.h>
 #include <HalStorage.h>
+#include <LibraryText.h>
 #include <Memory.h>
 
 #include <cstdio>
