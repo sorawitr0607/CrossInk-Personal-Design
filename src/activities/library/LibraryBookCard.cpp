@@ -296,10 +296,9 @@ void LibraryActivity::drawBookCard() {
   } else {
     const auto& button = card.genreButton;
     renderer.drawRect(button.x, button.y, button.width, button.height);
-    drawBookLabel(SETTINGS.libraryShowGenre && !card.genre.empty() ? card.genre.c_str()
-                  : card.genre.empty()                             ? tr(STR_LIBRARY_ADD_GENRE)
-                                                                   : tr(STR_LIBRARY_CHANGE_GENRE),
-                  library_shelf::FONT_SMALL, button.x + 6, button.y + 5, button.width - 28);
+    const char* genreLabel = tr(STR_LIBRARY_ADD_GENRE);
+    if (!card.genre.empty()) genreLabel = SETTINGS.libraryShowGenre ? card.genre.c_str() : tr(STR_LIBRARY_CHANGE_GENRE);
+    drawBookLabel(genreLabel, library_shelf::FONT_SMALL, button.x + 6, button.y + 5, button.width - 28);
     renderer.drawLine(button.x + button.width - 17, button.y + 10, button.x + button.width - 12, button.y + 15);
     renderer.drawLine(button.x + button.width - 12, button.y + 15, button.x + button.width - 7, button.y + 10);
   }
